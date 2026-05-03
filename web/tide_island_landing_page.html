@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tide Island — A calm dynamic island for Hyprland</title>
+  <meta
+    name="description"
+    content="Tide Island is a smooth dynamic island for Hyprland, bringing music, workspaces, lyrics, controls, and system status into one clean top-center interface."
+  />
+
+  <style>
+    @font-face {
+      font-family: "Lora";
+      src:
+        local("Lora"),
+        url("./assets/Lora-VariableFont_wght.ttf") format("truetype");
+      font-weight: 400 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Inter Display";
+      src:
+        local("Inter Display"),
+        local("Inter"),
+        url("./assets/InterVariable.ttf") format("truetype");
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "JetBrainsMono Nerd Font";
+      src:
+        local("JetBrainsMono Nerd Font"),
+        local("JetBrains Mono Nerd Font"),
+        url("./assets/JetBrains-Mono-Nerd-Font-Complete.ttf") format("truetype");
+      font-weight: 400 700;
+      font-style: normal;
+      font-display: block;
+    }
+
+    :root {
+      --component-bg: #e8e6dc;
+      --text: #141413;
+      --split-line: #e8e6dc;
+      --button: #d97757;
+      --selected: #d97757;
+
+      --page-bg: #f5f1e8;
+      --paper: #fbf8ef;
+      --muted: #6f6a60;
+      --border: rgba(20, 20, 19, 0.14);
+      --border-soft: rgba(20, 20, 19, 0.08);
+
+      --island-bg: #000000;
+      --island-card: #1c1c1e;
+      --island-card-2: #2c2c2e;
+      --island-text: #ffffff;
+      --island-muted: #a1a1aa;
+      --island-green: #34c759;
+      --island-font: "Inter Display", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --icon-font: "JetBrainsMono Nerd Font", "Symbols Nerd Font", var(--island-font);
+      --page-font: "Lora", Georgia, serif;
+      --player-bar: #b56cff;
+      --player-bar-muted: #5f4b72;
+
+      --island-w: 138px;
+      --island-h: 38px;
+      --island-radius: 999px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--page-bg);
+      font-family: var(--page-font);
+      line-height: 1.55;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page-shell {
+      width: min(1040px, calc(100% - 44px));
+      margin: 0 auto;
+    }
+
+    .site-header {
+      height: 72px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--text);
+      position: relative;
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 999px;
+      background: var(--button);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    .title-page {
+      min-height: calc(100vh - 72px);
+      display: grid;
+      align-items: center;
+      padding: 56px 0 92px;
+    }
+
+    .title-inner {
+      max-width: 940px;
+    }
+
+    .eyebrow {
+      margin-bottom: 28px;
+      color: var(--button);
+      font-size: 15px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+    }
+
+    .title-page h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(60px, 10vw, 132px);
+      line-height: 0.92;
+      letter-spacing: -0.064em;
+      font-weight: 400;
+    }
+
+    .title-lede {
+      max-width: 650px;
+      margin: 30px 0 0;
+      color: var(--muted);
+      font-size: clamp(18px, 2vw, 22px);
+      font-weight: 400;
+      line-height: 1.55;
+    }
+
+    .title-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 38px;
+      flex-wrap: wrap;
+    }
+
+    .mission-section {
+      padding: 12px 0 128px;
+      border-top: 1px solid transparent;
+    }
+
+    .mission-copy {
+      max-width: 980px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .mission-copy p {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 68px);
+      line-height: 1.08;
+      letter-spacing: -0.05em;
+      text-wrap: balance;
+    }
+
+    .mission-copy p + p {
+      margin-top: 14px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .button-primary {
+      background: var(--text);
+      border-color: var(--text);
+      color: var(--page-bg);
+    }
+
+    .button-secondary:hover,
+    .button-primary:hover {
+      border-color: var(--button);
+    }
+
+    .demo-section {
+      min-height: 100vh;
+      display: grid;
+      align-items: center;
+      padding: 88px 0;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .demo-heading {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      margin-bottom: 42px;
+      align-items: end;
+    }
+
+    .demo-heading h2,
+    .section h2 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 1;
+      letter-spacing: -0.055em;
+      font-weight: 400;
+    }
+
+    .demo-heading p,
+    .section-intro {
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 400;
+    }
+
+    .demo-wrap {
+      position: relative;
+    }
+
+    .demo-screen {
+      position: relative;
+      height: 500px;
+      border-radius: 28px;
+      background: var(--component-bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .desktop-topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 42px;
+      border-bottom: 1px solid rgba(20, 20, 19, 0.1);
+      background: rgba(245, 241, 232, 0.38);
+    }
+
+    .desktop-topbar::before,
+    .desktop-topbar::after {
+      content: "";
+      position: absolute;
+      top: 17px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(20, 20, 19, 0.18);
+    }
+
+    .desktop-topbar::before {
+      left: 22px;
+      width: 62px;
+    }
+
+    .desktop-topbar::after {
+      right: 22px;
+      width: 86px;
+    }
+
+    .fake-window {
+      position: absolute;
+      border-radius: 20px;
+      border: 1px solid rgba(20, 20, 19, 0.12);
+      background: rgba(251, 248, 239, 0.36);
+      overflow: hidden;
+    }
+
+    .fake-window::before {
+      content: "";
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 44px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(20, 20, 19, 0.12);
+    }
+
+    .fake-window::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 22px;
+      top: 42px;
+      height: 1px;
+      background: rgba(20, 20, 19, 0.07);
+      box-shadow:
+        0 22px 0 rgba(20, 20, 19, 0.055),
+        0 44px 0 rgba(20, 20, 19, 0.045);
+    }
+
+    .fake-window.one {
+      left: 52px;
+      top: 142px;
+      width: 190px;
+      height: 132px;
+    }
+
+    .fake-window.two {
+      right: 56px;
+      top: 172px;
+      width: 282px;
+      height: 154px;
+    }
+
+    .fake-window.three {
+      left: 190px;
+      bottom: 58px;
+      width: 246px;
+      height: 88px;
+    }
+
+    .demo-stage {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 680px;
+      height: 420px;
+      transform-origin: top center;
+      pointer-events: none;
+    }
+
+    .island {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: var(--island-w);
+      height: var(--island-h);
+      transform: translateX(-50%);
+      border-radius: var(--island-radius);
+      background: var(--island-bg);
+      color: var(--island-text);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+      font-family: var(--island-font);
+      font-weight: 760;
+      letter-spacing: -0.02em;
+      transition:
+        width 340ms cubic-bezier(0.22, 1, 0.36, 1),
+        height 340ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 340ms cubic-bezier(0.22, 1, 0.36, 1),
+        top 340ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: auto;
+    }
+
+    .island-content {
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transition:
+        opacity 130ms ease,
+        transform 130ms ease;
+    }
+
+    .island-content.is-hidden {
+      opacity: 0;
+      transform: translateY(4px) scale(0.995);
+    }
+
+    .clock-state,
+    .lyrics-state {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .clock-state span:last-child {
+      margin-left: 3px;
+      font-size: 12px;
+      opacity: 0.86;
+      font-weight: 720;
+    }
+
+    .notify-state {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 7px 16px;
+      white-space: nowrap;
+    }
+
+    .notify-icon {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      color: #f4f5f7;
+      font-size: 18px;
+      line-height: 1;
+      font-family: var(--icon-font);
+      font-weight: 700;
+    }
+
+    .notify-text {
+      min-width: 0;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.15px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 0.95;
+    }
+
+    .music-state {
+      height: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-family: var(--island-font);
+    }
+
+    .music-top {
+      display: grid;
+      grid-template-columns: 60px 1fr 44px;
+      gap: 16px;
+      align-items: center;
+      min-height: 60px;
+    }
+
+    .album-art {
+      width: 60px;
+      height: 60px;
+      border-radius: 14px;
+      background: #2c2c2e;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+
+    .album-art::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      width: 22px;
+      height: 22px;
+      border-radius: 8px;
+      background: var(--button);
+    }
+
+    .album-art::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      width: 26px;
+      height: 16px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .song-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.15px;
+      line-height: 1.05;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .song-artist {
+      margin-top: 4px;
+      color: #8e8e93;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .visualizer {
+      width: 44px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .visualizer-bar {
+      width: 4px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--player-bar);
+      transition:
+        height 120ms ease,
+        background-color 140ms ease;
+    }
+
+    .progress-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: #8e8e93;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .progress-track {
+      position: relative;
+      height: 6px;
+      border-radius: 3px;
+      background: #333333;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 58%;
+      border-radius: inherit;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .music-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 50px;
+      height: 36px;
+      color: rgba(255,255,255,.96);
+    }
+
+    .player-control {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+    }
+
+    .player-control svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+      fill: currentColor;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+
+    .control-state {
+      height: 100%;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: 28px 80px 20px 76px 76px;
+      gap: 12px;
+      font-family: var(--island-font);
+    }
+
+    .cc-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cc-time {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .cc-time-hero {
+      color: #f7f8fb;
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.45px;
+    }
+
+    .cc-date {
+      color: #8e8e93;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .cc-battery {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--island-text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .battery-shell {
+      width: 28px;
+      height: 14px;
+      position: relative;
+      display: inline-block;
+    }
+
+    .battery-shell-body {
+      position: absolute;
+      inset: 0 2px 0 0;
+      border-radius: 4px;
+      border: 1px solid #8e8e93;
+      overflow: hidden;
+    }
+
+    .battery-shell::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 4px;
+      width: 2px;
+      height: 6px;
+      border-radius: 1px;
+      background: #8e8e93;
+    }
+
+    .battery-fill {
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      bottom: 2px;
+      width: calc((100% - 4px) * var(--battery-level, 1));
+      border-radius: 2px;
+      background: var(--island-green);
+    }
+
+    .cc-toggles {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .cc-card {
+      border-radius: 20px;
+      background: var(--island-card);
+      padding: 14px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.045);
+      font-family: var(--island-font);
+    }
+
+    .cc-card-head {
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+
+    .toggle-pill {
+      width: 34px;
+      height: 18px;
+      padding: 2px;
+      border-radius: 999px;
+      background: var(--island-green);
+    }
+
+    .toggle-pill::after {
+      content: "";
+      display: block;
+      margin-left: auto;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .cc-card-body {
+      margin-top: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .cc-card-title {
+      color: #f5f5f7;
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1;
+    }
+
+    .cc-card-status {
+      margin-top: 5px;
+      color: #9b9da4;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .cc-chevron {
+      color: #8f9198;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .cc-battery-drawer {
+      height: 20px;
+      position: relative;
+    }
+
+    .cc-battery-handle {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: 20px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .cc-battery-handle::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      width: 48px;
+      height: 5px;
+      border-radius: 3px;
+      background: #8f9198;
+      opacity: 0.88;
+      transform: translateX(-50%);
+    }
+
+    .cc-slider-card {
+      height: 76px;
+      border-radius: 24px;
+      background: var(--island-card);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.045);
+      font-family: var(--island-font);
+    }
+
+    .cc-slider-title {
+      font-size: 13px;
+      font-weight: 650;
+      margin-bottom: 12px;
+      color: #f5f5f7;
+    }
+
+    .cc-slider-track {
+      position: relative;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--island-card-2);
+      overflow: hidden;
+    }
+
+    .cc-slider-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      transform: translateY(-50%);
+      color: #8e8e93;
+      font-size: 13px;
+      font-family: var(--icon-font);
+      z-index: 2;
+    }
+
+    .cc-slider-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: max(34px, min(100%, calc(var(--value, 0.55) * 100% + 1px)));
+      border-radius: inherit;
+      background: #f5f5f7;
+    }
+
+    .cc-slider-knob {
+      position: absolute;
+      left: calc(var(--value, 0.55) * 100%);
+      top: -1px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: white;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .workspace-state {
+      height: 100%;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .workspace-tile {
+      border-radius: 18px;
+      background: var(--island-card);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.055);
+      padding: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .workspace-tile.selected {
+      box-shadow: inset 0 0 0 2px var(--selected);
+    }
+
+    .workspace-num {
+      color: rgba(255,255,255,.86);
+      font-size: 11px;
+      font-weight: 780;
+      margin-bottom: 10px;
+    }
+
+    .workspace-block {
+      position: absolute;
+      border-radius: 8px;
+      background: rgba(255,255,255,.13);
+    }
+
+    .workspace-block.a { left: 13px; top: 38px; width: 46%; height: 38px; }
+    .workspace-block.b { right: 13px; bottom: 13px; width: 34%; height: 42px; background: rgba(217,119,87,.25); }
+    .workspace-block.c { left: 13px; right: 13px; bottom: 14px; height: 24px; background: rgba(255,255,255,.1); }
+
+    .status-state {
+      height: 100%;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 17px;
+      color: rgba(255,255,255,.92);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .status-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--button);
+    }
+
+    .tiny-bars {
+      display: inline-flex;
+      align-items: end;
+      gap: 3px;
+      height: 14px;
+    }
+
+    .tiny-bars i {
+      width: 3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.7);
+      animation: tinyPulse 900ms ease-in-out infinite;
+    }
+
+    .tiny-bars i:nth-child(1) { height: 6px; animation-delay: -80ms; }
+    .tiny-bars i:nth-child(2) { height: 11px; animation-delay: -160ms; }
+    .tiny-bars i:nth-child(3) { height: 8px; animation-delay: -240ms; }
+    .tiny-bars i:nth-child(4) { height: 13px; animation-delay: -320ms; }
+    .tiny-bars i:nth-child(5) { height: 7px; animation-delay: -400ms; }
+
+    @keyframes tinyPulse {
+      50% { transform: scaleY(.45); opacity: .55; }
+    }
+
+    .demo-controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .demo-button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 999px;
+      height: 36px;
+      padding: 0 13px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .demo-button.active {
+      background: var(--button);
+      border-color: var(--button);
+      color: #fffaf2;
+    }
+
+    .section {
+      padding: 110px 0;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 70px;
+      align-items: start;
+      margin-bottom: 52px;
+    }
+
+    .feature-list {
+      border-top: 1px solid var(--border);
+    }
+
+    .feature-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 60px;
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .feature-name {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+
+    .feature-text {
+      max-width: 640px;
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 400;
+    }
+
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+    }
+
+    .plain-list {
+      border-top: 1px solid var(--border);
+    }
+
+    .plain-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 28px;
+      padding: 17px 0;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .plain-row span:last-child {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .tag-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .tag {
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+    }
+
+    .footer {
+      padding: 42px 0 54px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      border-top: 1px solid var(--border-soft);
+      font-size: 14px;
+      font-weight: 400;
+    }
+
+    .footer strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    @media (max-width: 920px) {
+      .demo-heading,
+      .section-header,
+      .two-column {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .demo-stage {
+        transform: translateX(-50%) scale(0.86);
+      }
+
+      .feature-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page-shell {
+        width: min(100% - 30px, 1040px);
+      }
+
+      .site-header {
+        height: 66px;
+      }
+
+      .nav-links {
+        gap: 14px;
+        font-size: 13px;
+      }
+
+      .title-page {
+        min-height: calc(100vh - 66px);
+      }
+
+      .title-page h1 {
+        font-size: 58px;
+      }
+
+      .mission-section {
+        padding: 0 0 88px;
+      }
+
+      .mission-copy p {
+        font-size: 36px;
+      }
+
+      .demo-screen {
+        height: 390px;
+      }
+
+      .demo-stage {
+        transform: translateX(-50%) scale(0.68);
+        top: 8px;
+      }
+
+      .fake-window.one {
+        left: 24px;
+        width: 150px;
+      }
+
+      .fake-window.two {
+        right: 24px;
+        width: 190px;
+      }
+
+      .fake-window.three {
+        left: 90px;
+      }
+
+      .section {
+        padding: 78px 0;
+      }
+
+      .plain-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .footer {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .title-page h1 {
+        font-size: 50px;
+      }
+
+      .mission-copy p {
+        font-size: 30px;
+      }
+
+      .demo-screen {
+        height: 350px;
+      }
+
+      .demo-stage {
+        transform: translateX(-50%) scale(0.56);
+      }
+
+      .desktop-topbar::after {
+        display: none;
+      }
+
+      .fake-window {
+        opacity: 0.58;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header page-shell">
+    <a class="brand" href="#top" aria-label="Tide Island home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Tide Island</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#mission">Mission</a>
+      <a href="#demo">Demo</a>
+      <a href="https://github.com/enhaoswen/Tide-island">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="title-page page-shell">
+      <div class="title-inner">
+        <h1>A calm dynamic island for Hyprland.</h1>
+        <p class="title-lede">
+          Tide Island brings music, workspaces, lyrics, quick controls, and system status into one smooth top-center interface.
+        </p>
+        <div class="title-actions">
+          <a class="button button-primary" href="https://github.com/enhaoswen/Tide-island">View on GitHub</a>
+          <a class="button button-secondary" href="#demo">See the demo</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="mission-section" id="mission">
+      <div class="page-shell">
+        <div class="mission-copy">
+          <p>Tide is not a feature — it's a rhythm.</p>
+          <p>It brings tides to your screen.</p>
+          <p>What comes, comes. What goes, goes.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-section page-shell" id="demo">
+      <div>
+        <div class="demo-heading">
+          <h2>The island, in motion.</h2>
+          <p>
+            A code-built preview of the actual Tide Island states: clock, notification, player, control center with TLP modes, workspace overview, and status page.
+          </p>
+        </div>
+
+        <div class="demo-wrap" aria-label="Interactive Tide Island demo">
+          <div class="demo-screen">
+            <div class="desktop-topbar" aria-hidden="true"></div>
+            <div class="fake-window one" aria-hidden="true"></div>
+            <div class="fake-window two" aria-hidden="true"></div>
+            <div class="fake-window three" aria-hidden="true"></div>
+
+            <div class="demo-stage">
+              <div class="island" id="island">
+                <div class="island-content" id="islandContent"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-controls" aria-label="Demo controls">
+            <button class="demo-button active" data-state="clock" type="button">Clock</button>
+            <button class="demo-button" data-state="notify" type="button">Notify</button>
+            <button class="demo-button" data-state="music" type="button">Music</button>
+            <button class="demo-button" data-state="control" type="button">Control</button>
+            <button class="demo-button" data-state="workspaces" type="button">Workspaces</button>
+            <button class="demo-button" data-state="status" type="button">Status</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page-shell" id="features">
+      <div class="section-header">
+        <h2>Everything you check, folded into one island.</h2>
+        <p class="section-intro">
+          Tide Island keeps common desktop moments close without turning them into a full panel.
+        </p>
+      </div>
+
+      <div class="feature-list">
+        <div class="feature-row">
+          <div class="feature-name">Music Player</div>
+          <div class="feature-text">Control MPRIS players with album art, progress, visualizer bars, and quick actions.</div>
+        </div>
+        <div class="feature-row">
+          <div class="feature-name">Control Center</div>
+          <div class="feature-text">Open a compact system panel for Wi‑Fi, Bluetooth, brightness, sound, battery status, and TLP power modes.</div>
+        </div>
+        <div class="feature-row">
+          <div class="feature-name">Workspaces</div>
+          <div class="feature-text">Preview Hyprland workspaces from a smooth top-center overview.</div>
+        </div>
+        <div class="feature-row">
+          <div class="feature-name">Lyrics</div>
+          <div class="feature-text">Show current lyrics directly in the island while music is playing.</div>
+        </div>
+        <div class="feature-row">
+          <div class="feature-name">Custom Page</div>
+          <div class="feature-text">Create a status strip with time, battery, CPU, RAM, volume, brightness, and more.</div>
+        </div>
+        <div class="feature-row">
+          <div class="feature-name">System OSD</div>
+          <div class="feature-text">Show volume, brightness, caps lock, workspace, and battery events cleanly.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page-shell" id="interactions">
+      <div class="section-header">
+        <h2>Interactions</h2>
+        <p class="section-intro">Simple gestures and shortcuts keep the island fast, readable, and out of the way.</p>
+      </div>
+
+      <div class="plain-list">
+        <div class="plain-row"><span>Left click</span><span>Open music player</span></div>
+        <div class="plain-row"><span>Right click</span><span>Open control center</span></div>
+        <div class="plain-row"><span>Swipe left</span><span>Show lyrics</span></div>
+        <div class="plain-row"><span>Swipe right</span><span>Show custom page</span></div>
+        <div class="plain-row"><span>Super + Tab</span><span>Open workspace overview</span></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer page-shell">
+    <div><strong>Tide Island</strong> — A calm dynamic island for Hyprland.</div>
+    <div>Made by enhaoswen.</div>
+  </footer>
+
+  <script>
+    const island = document.getElementById("island");
+    const content = document.getElementById("islandContent");
+    const buttons = Array.from(document.querySelectorAll(".demo-button"));
+
+    const states = {
+      clock: {
+        width: 138,
+        height: 38,
+        radius: "999px",
+        large: false,
+        html: `
+          <div class="clock-state">
+            <div><span>08:33</span><span>am</span></div>
+          </div>
+        `
+      },
+      notify: {
+        width: 320,
+        height: 56,
+        radius: "999px",
+        large: false,
+        html: `
+          <div class="notify-state">
+            <div class="notify-icon" aria-hidden="true"></div>
+            <div class="notify-text">Workspace switched to 2</div>
+          </div>
+        `
+      },
+      music: {
+        width: 400,
+        height: 165,
+        radius: "40px",
+        large: true,
+        html: `
+          <div class="music-state">
+            <div class="music-top">
+              <div class="album-art" aria-hidden="true"></div>
+              <div>
+                <div class="song-title">Back to Back Hug</div>
+                <div class="song-artist">JJ Lin</div>
+              </div>
+              <div class="visualizer" aria-hidden="true">
+                <span class="visualizer-bar" data-bar="0"></span>
+                <span class="visualizer-bar" data-bar="1"></span>
+                <span class="visualizer-bar" data-bar="2"></span>
+                <span class="visualizer-bar" data-bar="3"></span>
+                <span class="visualizer-bar" data-bar="4"></span>
+              </div>
+            </div>
+
+            <div class="progress-row">
+              <span>1:24</span>
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <span>3:54</span>
+            </div>
+
+            <div class="music-controls" aria-hidden="true">
+              <span class="player-control" title="Previous">
+                <svg viewBox="0 0 28 28" role="presentation" aria-hidden="true">
+                  <rect x="3" y="5" width="3" height="18" rx="1.5"></rect>
+                  <path d="M14 5 L6 14 L14 23 Z"></path>
+                  <path d="M23 5 L15 14 L23 23 Z"></path>
+                </svg>
+              </span>
+              <span class="player-control" title="Pause">
+                <svg viewBox="0 0 28 28" role="presentation" aria-hidden="true">
+                  <rect x="8" y="4" width="6" height="20" rx="2"></rect>
+                  <rect x="18" y="4" width="6" height="20" rx="2"></rect>
+                </svg>
+              </span>
+              <span class="player-control" title="Next">
+                <svg viewBox="0 0 28 28" role="presentation" aria-hidden="true">
+                  <path d="M5 5 L13 14 L5 23 Z"></path>
+                  <path d="M14 5 L22 14 L14 23 Z"></path>
+                  <rect x="22" y="5" width="3" height="18" rx="1.5"></rect>
+                </svg>
+              </span>
+            </div>
+          </div>
+        `
+      },
+      control: {
+        width: 420,
+        height: 352,
+        radius: "44px",
+        large: true,
+        html: `
+          <div class="control-state">
+            <div class="cc-top">
+              <div class="cc-time">
+                <strong class="cc-time-hero">08:33am</strong>
+                <span class="cc-date">Thu, Apr 16</span>
+              </div>
+              <div class="cc-battery">
+                <span>100%</span>
+                <span class="battery-shell" style="--battery-level: 1;">
+                  <span class="battery-shell-body">
+                    <span class="battery-fill"></span>
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div class="cc-toggles">
+              <div class="cc-card">
+                <div class="cc-card-head">
+                  <span class="toggle-pill"></span>
+                </div>
+                <div class="cc-card-body">
+                  <div>
+                    <div class="cc-card-title">Wi-Fi</div>
+                    <div class="cc-card-status">Connected</div>
+                  </div>
+                  <span class="cc-chevron">›</span>
+                </div>
+              </div>
+              <div class="cc-card">
+                <div class="cc-card-head">
+                  <span class="toggle-pill"></span>
+                </div>
+                <div class="cc-card-body">
+                  <div>
+                    <div class="cc-card-title">Bluetooth</div>
+                    <div class="cc-card-status">1 device</div>
+                  </div>
+                  <span class="cc-chevron">›</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cc-battery-drawer">
+              <span class="cc-battery-handle" aria-hidden="true"></span>
+            </div>
+
+            <div class="cc-slider-card">
+              <div class="cc-slider-title">Display</div>
+              <div class="cc-slider-track" style="--value: 0.58;">
+                <span class="cc-slider-fill"></span>
+                <span class="cc-slider-icon" aria-hidden="true">󰃟</span>
+                <span class="cc-slider-knob"></span>
+              </div>
+            </div>
+
+            <div class="cc-slider-card">
+              <div class="cc-slider-title">Sound</div>
+              <div class="cc-slider-track" style="--value: 0.74;">
+                <span class="cc-slider-fill"></span>
+                <span class="cc-slider-icon" aria-hidden="true">󰕾</span>
+                <span class="cc-slider-knob"></span>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      workspaces: {
+        width: 560,
+        height: 210,
+        radius: "38px",
+        large: true,
+        html: `
+          <div class="workspace-state">
+            <div class="workspace-tile selected">
+              <div class="workspace-num">1</div>
+              <span class="workspace-block a"></span>
+              <span class="workspace-block b"></span>
+            </div>
+            <div class="workspace-tile">
+              <div class="workspace-num">2</div>
+              <span class="workspace-block c"></span>
+            </div>
+            <div class="workspace-tile">
+              <div class="workspace-num">3</div>
+              <span class="workspace-block a"></span>
+            </div>
+            <div class="workspace-tile">
+              <div class="workspace-num">4</div>
+              <span class="workspace-block b"></span>
+            </div>
+            <div class="workspace-tile">
+              <div class="workspace-num">5</div>
+              <span class="workspace-block a"></span>
+              <span class="workspace-block c"></span>
+            </div>
+            <div class="workspace-tile">
+              <div class="workspace-num">6</div>
+            </div>
+          </div>
+        `
+      },
+      status: {
+        width: 580,
+        height: 42,
+        radius: "999px",
+        large: false,
+        html: `
+          <div class="status-state">
+            <span class="status-item"><span class="status-dot"></span>08:33 am</span>
+            <span class="status-item">Thu, Apr 16</span>
+            <span class="status-item">100%</span>
+            <span class="status-item">Vol 51%</span>
+            <span class="status-item">Bri 24%</span>
+            <span class="status-item">CPU 2%</span>
+            <span class="tiny-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          </div>
+        `
+      }
+    };
+
+    let currentState = "clock";
+    let isAnimating = false;
+    let autoplay = true;
+    let autoplayTimer = null;
+    let visualizerTimer = null;
+    let visualizerPhase = 0;
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function applyShape(name) {
+      const state = states[name];
+      island.style.setProperty("--island-w", `${state.width}px`);
+      island.style.setProperty("--island-h", `${state.height}px`);
+      island.style.setProperty("--island-radius", state.radius);
+    }
+
+    function setActiveButton(name) {
+      buttons.forEach(button => {
+        button.classList.toggle("active", button.dataset.state === name);
+      });
+    }
+
+    function isLargeTransition(from, to) {
+      if (from === to) return false;
+      return states[from].large || states[to].large;
+    }
+
+    function visualizerLevel(index) {
+      const phase = visualizerPhase + index * 0.78;
+      const primary = (Math.sin(phase) + 1) * 0.5;
+      const secondary = (Math.sin(phase * 2 + index * 0.95) + 1) * 0.5;
+      return 0.22 + primary * 0.42 + secondary * 0.24;
+    }
+
+    function stopVisualizer() {
+      if (visualizerTimer) {
+        clearInterval(visualizerTimer);
+        visualizerTimer = null;
+      }
+    }
+
+    function paintVisualizer() {
+      const bars = content.querySelectorAll(".visualizer-bar");
+      if (!bars.length) return;
+
+      bars.forEach((bar, index) => {
+        const nextHeight = 6 + (22 - 6) * visualizerLevel(index);
+        bar.style.height = `${nextHeight.toFixed(2)}px`;
+        bar.style.backgroundColor = "var(--player-bar)";
+      });
+    }
+
+    function syncDynamicBits(stateName) {
+      stopVisualizer();
+
+      if (stateName === "music") {
+        paintVisualizer();
+        visualizerTimer = setInterval(() => {
+          visualizerPhase += 0.18;
+          if (visualizerPhase > Math.PI * 2) visualizerPhase -= Math.PI * 2;
+          paintVisualizer();
+        }, 32);
+        return;
+      }
+    }
+
+    async function setIslandState(nextState, options = {}) {
+      if (!states[nextState] || isAnimating) return;
+      if (options.manual) stopAutoplay();
+
+      const large = isLargeTransition(currentState, nextState);
+      isAnimating = true;
+      setActiveButton(nextState);
+
+      if (large) {
+        content.classList.add("is-hidden");
+        await sleep(55);
+
+        applyShape(nextState);
+        await sleep(330);
+
+        content.innerHTML = states[nextState].html;
+        currentState = nextState;
+        syncDynamicBits(nextState);
+        await sleep(10);
+        content.classList.remove("is-hidden");
+        await sleep(135);
+      } else {
+        content.classList.add("is-hidden");
+        applyShape(nextState);
+        await sleep(70);
+
+        content.innerHTML = states[nextState].html;
+        currentState = nextState;
+        syncDynamicBits(nextState);
+        content.classList.remove("is-hidden");
+        await sleep(120);
+      }
+
+      isAnimating = false;
+    }
+
+    function stopAutoplay() {
+      autoplay = false;
+      if (autoplayTimer) {
+        clearTimeout(autoplayTimer);
+        autoplayTimer = null;
+      }
+    }
+
+    function scheduleAutoplay() {
+      if (!autoplay) return;
+
+      const sequence = [
+        { state: "clock", duration: 1800 },
+        { state: "notify", duration: 2200 },
+        { state: "clock", duration: 800 },
+        { state: "music", duration: 2800 },
+        { state: "clock", duration: 1600 }
+      ];
+
+      let index = 0;
+
+      async function run() {
+        if (!autoplay) return;
+        const item = sequence[index];
+        await setIslandState(item.state);
+        autoplayTimer = setTimeout(() => {
+          index = (index + 1) % sequence.length;
+          run();
+        }, item.duration);
+      }
+
+      run();
+    }
+
+    buttons.forEach(button => {
+      button.addEventListener("click", () => {
+        setIslandState(button.dataset.state, { manual: true });
+      });
+    });
+
+    content.innerHTML = states.clock.html;
+    applyShape("clock");
+    syncDynamicBits("clock");
+    scheduleAutoplay();
+  </script>
+</body>
+</html>
