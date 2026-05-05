@@ -89,12 +89,14 @@ Video: https://www.youtube.com/watch?v=vCA8sWLJjiw&list=LL&index=2
   - NetworkManager, or
   - iwd
 
-### Optional Runtime Dependencies
+## Features
 
-- `cava`
-  - Required only if you enable the `cava` left-swipe module.
-- ImageMagick (`magick` or `convert`)
-  - Used only for workspace overview wallpaper thumbnail caching.
+- **Dynamic Island**: Smoothly morphing pill that displays system info, music, and more.
+- **Gesture Navigation**: 
+  - **Touch**: Swipe left/right on the island to switch views.
+  - **Trackpad**: Use a two-finger horizontal swipe (scroll) anywhere at the top of the screen to transition between Time, Lyrics, and Custom views.
+- **Music Integration**: MPRIS support with lyrics and album art.
+- **Workspace Overview**: A beautiful workspace switcher with wallpaper previews.
 - `lyricsmpris`
   - External helper used for lyrics integration.
 - `playerctld`

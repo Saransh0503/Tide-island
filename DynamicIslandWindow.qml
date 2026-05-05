@@ -699,7 +699,6 @@ PanelWindow {
                 smartRestoreState();
                 return;
             default:
-                console.warn("Unknown Dynamic Island click action:", actionName);
             }
         }
 
@@ -2472,8 +2471,6 @@ PanelWindow {
         property bool isSwiping: false
         
         onWheel: (wheel) => {
-            console.debug("[ROOT PING] Wheel Event Detected!");
-
             if (!isSwiping) {
                 isSwiping = true;
                 swipeStartProgress = islandContainer.swipeTransitionProgress;
