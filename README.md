@@ -104,48 +104,51 @@ Video: https://www.youtube.com/watch?v=vCA8sWLJjiw&list=LL&index=2
 
 - Any nerd font (for icon) && any font (for text) 
 
-## Getting Start
+## Installation
 
-### Download 
+### Arch Linux (Recommended)
+The easiest way to install Tide Island is via the AUR or by building the provided PKGBUILD.
+
+**Using an AUR Helper:**
 ```bash
-git clone https://github.com/enhaoswen/Dynamic-Island-on-Hyprland.git && cd Dynamic-Island-on-Hyprland
+yay -S tide-island-git
 ```
 
-> make sure you change the program if is necessary, check important things at the end.
-
-
-### Build 
-
+**Manual Installation:**
 ```bash
-cmake -S . -B build && cmake --build build -j"$(nproc)" && \
-cmake -S ./ConnectivityBackend -B ./ConnectivityBackend/build && \
-cmake --build ./ConnectivityBackend/build -j"$(nproc)" && \
-mkdir -p ~/.config/quickshell/dynamic_island/{IslandBackend,ConnectivityBackend,bin} && \
-cp ./*.qml ~/.config/quickshell/dynamic_island/ && \
-cp ./bin/* ~/.config/quickshell/dynamic_island/bin/ && \
-cp build/{libIslandBackend.so,libIslandBackendplugin.so,qmldir,IslandBackend.qmltypes} \
-~/.config/quickshell/dynamic_island/IslandBackend/ && \
-cp ./ConnectivityBackend/{libConnectivityBackendplugin.so,qmldir} \
-~/.config/quickshell/dynamic_island/ConnectivityBackend/
-
+git clone https://github.com/sai21-learn/Tide-island.git
+cd Tide-island
+makepkg -si
 ```
 
-### Clean 
+### Starting the Island
+Tide Island includes a systemd user service for automatic startup and background management.
 
+**Enable and start the service:**
 ```bash
-cd ../.. && rm -rf Dynamic-Island-on-Hyprland
+systemctl --user enable --now tide-island
 ```
 
-#### To run in Hyprland
+**Manage the service:**
 ```bash
-QML2_IMPORT_PATH=~/.config/quickshell/dynamic_island quickshell -p ~/.config/quickshell/dynamic_island/shell.qml
+# Restart the island (e.g. after config changes)
+systemctl --user restart tide-island
+
+# Stop the island
+systemctl --user stop tide-island
+
+# View logs
+journalctl --user -u tide-island -f
 ```
 
-### To activate workspace overview
-```conf
-bind = SUPER, TAB, exec, qs ipc -p ~/.config/quickshell/dynamic_island/shell.qml call overview toggle
+### Manual Usage
+If you prefer to run it manually:
+```bash
+tide-island
 ```
-> It is fine to change super tab to something else
+
+## Configuration
+The default configuration is located at `/usr/share/tide-island/UserConfig.qml`.
 
 ## Acknowledgments
 
