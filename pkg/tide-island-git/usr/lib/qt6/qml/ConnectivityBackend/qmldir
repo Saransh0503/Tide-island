@@ -1,7 +1,0 @@
-module ConnectivityBackend
-linktarget ConnectivityBackendplugin
-optional plugin ConnectivityBackendplugin
-classname ConnectivityBackendPlugin
-typeinfo ConnectivityBackend.qmltypes
-prefer :/ConnectivityBackend/
-
