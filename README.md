@@ -176,4 +176,4 @@ The default configuration is located at `/usr/share/tide-island/UserConfig.qml`.
 ## Join the community
 - Discord: https://discord.gg/gEmqgz76
 
-- Gmail: whysoorak.official@gmail.com
+- Gmail: whysooraj.official@gmail.com
