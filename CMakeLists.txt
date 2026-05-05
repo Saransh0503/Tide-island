@@ -11,13 +11,19 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Network DBus)
 find_library(UDEV_LIB NAMES udev REQUIRED)
 
-# IslandBackend Module
+# Main Backend Module (Combining all C++ components)
 qt_add_qml_module(IslandBackend
     URI IslandBackend
     VERSION 1.0
     SOURCES
         SysBackend.h
         SysBackend.cpp
+        ConnectivityBackend/BluetoothPairingAgent.h
+        ConnectivityBackend/BluetoothPairingAgent.cpp
+        ConnectivityBackend/WifiController.h
+        ConnectivityBackend/WifiController.cpp
+        ConnectivityBackend/WifiNetworkModel.h
+        ConnectivityBackend/WifiNetworkModel.cpp
 )
 
 target_link_libraries(IslandBackend PRIVATE
@@ -27,9 +33,6 @@ target_link_libraries(IslandBackend PRIVATE
     Qt6::DBus
     ${UDEV_LIB}
 )
-
-# ConnectivityBackend
-add_subdirectory(ConnectivityBackend)
 
 # Installation Rules
 include(GNUInstallDirs)
@@ -61,7 +64,7 @@ install(FILES
 install(PROGRAMS tide-island-launcher DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME tide-island)
 
 # Install bin/lyricsmpris
-install(DIRECTORY bin/ DESTINATION ${CMAKE_INSTALL_DATADIR}/tide-island/bin)
+install(PROGRAMS bin/lyricsmpris DESTINATION ${CMAKE_INSTALL_DATADIR}/tide-island/bin)
 
 # Install desktop entry
 install(FILES tide-island.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)

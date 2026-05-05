@@ -797,7 +797,10 @@ void WifiController::detectBackend() {
         m_iwdSignalsConnected = true;
     }
 
+    qDebug() << "[Wifi] Detecting backend: NM=" << hasNetworkManager << " Iwd=" << hasIwd;
+
     if (hasNetworkManager) {
+        qDebug() << "[Wifi] Selecting NetworkManager backend";
         unregisterIwdAgent();
         m_iwdPendingPassphrases.clear();
         setBackendName(QStringLiteral("networkmanager"));
@@ -808,6 +811,18 @@ void WifiController::detectBackend() {
         return;
     }
 
+    if (hasIwd) {
+        qDebug() << "[Wifi] Selecting Iwd backend";
+        setBackendName(QStringLiteral("iwd"));
+        setSupported(true);
+        setReadOnly(false);
+        setUnsupportedReason({});
+        ensureIwdAgentRegistered();
+        refreshStateInternal();
+        return;
+    }
+
+    qDebug() << "[Wifi] No supported backend found";
     disconnectDeviceSignals();
     m_savedConnectionsBySsid.clear();
     m_savedConnectionsDirty = true;
@@ -822,16 +837,6 @@ void WifiController::detectBackend() {
     m_networks.clear();
     m_wifiDevicePath.clear();
     m_iwdPendingPassphrases.clear();
-
-    if (hasIwd) {
-        setBackendName(QStringLiteral("iwd"));
-        setSupported(true);
-        setReadOnly(false);
-        setUnsupportedReason({});
-        ensureIwdAgentRegistered();
-        refreshStateInternal();
-        return;
-    }
 
     unregisterIwdAgent();
 

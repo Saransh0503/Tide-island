@@ -23,3 +23,6 @@ Tide-island/
 .idea/
 *.swp
 *.swo
+
+#code graphs
+.code-review-graph  

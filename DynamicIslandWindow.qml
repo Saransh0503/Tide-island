@@ -1839,7 +1839,7 @@ PanelWindow {
                 id: capsuleMouseArea
                 anchors.fill: parent
                 z: -1
-                enabled: !root.overviewVisible
+                enabled: !root.overviewVisible && twoFingerTouchArea.touchPoints.length < 2
                 acceptedButtons: root.dynamicIslandAcceptedButtons
                 preventStealing: true
                 property real swipeStartX: 0
@@ -1887,7 +1887,7 @@ PanelWindow {
                 }
 
                 onPositionChanged: (mouse) => {
-                    if (!pressed || !swipeArmed || suppressNextClick) return;
+                    if (!pressed || !swipeArmed || suppressNextClick || twoFingerTouchArea.touchPoints.length >= 2) return;
 
                     const mappedPoint = capsuleMouseArea.mapToItem(islandContainer, mouse.x, mouse.y);
                     const deltaX = mappedPoint.x - swipeLastX;
@@ -1983,6 +1983,83 @@ PanelWindow {
                         preparedOverviewOnPress = false;
                         islandContainer.handleConfiguredClickAction(userConfig.dynamicIslandSecondaryAction);
                     }
+                }
+            }
+
+            MultiPointTouchArea {
+                id: twoFingerTouchArea
+                anchors.fill: parent
+                z: 0
+                enabled: !root.overviewVisible
+                mouseEnabled: false
+                minimumTouchPoints: 2
+                maximumTouchPoints: 2
+
+                property real swipeStartX: 0
+                property real swipeStartProgress: 0
+                property bool swipeMoved: false
+
+                onPressed: (touchPoints) => {
+                    const centerPoint = islandContainer.mapFromItem(twoFingerTouchArea, 
+                        (touchPoints[0].x + touchPoints[1].x) / 2,
+                        (touchPoints[0].y + touchPoints[1].y) / 2);
+                    swipeStartX = centerPoint.x;
+                    swipeStartProgress = islandContainer.swipeTransitionProgress;
+                    swipeMoved = false;
+                    islandContainer.cancelSideSwipeSettle();
+                }
+
+                onUpdated: (touchPoints) => {
+                    const centerPoint = islandContainer.mapFromItem(twoFingerTouchArea, 
+                        (touchPoints[0].x + touchPoints[1].x) / 2,
+                        (touchPoints[0].y + touchPoints[1].y) / 2);
+                    
+                    const deltaX = centerPoint.x - swipeStartX;
+                    // User requested: Swipe Left (deltaX < 0) -> Lyrics (pos progress)
+                    //                 Swipe Right (deltaX > 0) -> Custom (neg progress)
+                    // The advanceSideSwipeProgress function expects Pos deltaX for Pos progress.
+                    // So we invert deltaX to match the user's requested directions.
+                    const logicalDeltaX = -deltaX;
+                    
+                    const nextProgress = islandContainer.advanceSideSwipeProgress(
+                        swipeStartProgress,
+                        logicalDeltaX
+                    );
+
+                    if (Math.abs(nextProgress - swipeStartProgress) > 0.03) {
+                        swipeMoved = true;
+                    }
+
+                    islandContainer.swipeTransitionProgress = nextProgress;
+                    mainCapsule.displayedWidth = mainCapsule.sideSwipePreviewWidth;
+                }
+
+                onReleased: {
+                    if (swipeMoved) {
+                        const settleResult = islandContainer.resolveSideSwipeSettle(
+                            swipeStartProgress,
+                            islandContainer.swipeTransitionProgress
+                        );
+
+                        islandContainer.beginSideSwipeSettle(settleResult.width);
+
+                        switch (settleResult.action) {
+                        case "time":
+                            islandContainer.showTimeCapsule();
+                            break;
+                        case "custom":
+                            islandContainer.showCustomCapsule();
+                            break;
+                        case "lyrics":
+                            islandContainer.showLyricsCapsule();
+                            break;
+                        default:
+                            islandContainer.swipeTransitionProgress = settleResult.progress;
+                        }
+                    } else {
+                        islandContainer.swipeTransitionProgress = swipeStartProgress;
+                    }
+                    swipeMoved = false;
                 }
             }
 
