@@ -5,7 +5,7 @@ pkgver=r214.47c8f20
 pkgrel=1
 pkgdesc="A dynamic island for Hyprland using Quickshell"
 arch=('x86_64')
-url="https://github.com/sai21-learn/Tide-island"
+url="https://github.com/enhaoswen/Tide-island"
 license=('unknown')
 depends=(
     'qt6-base'
