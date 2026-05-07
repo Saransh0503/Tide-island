@@ -64,8 +64,9 @@ install(FILES
 # Install launcher
 install(PROGRAMS tide-island-launcher DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME tide-island)
 
-# Install bin/lyricsmpris
+# Install helper executables
 install(PROGRAMS bin/lyricsmpris DESTINATION ${CMAKE_INSTALL_DATADIR}/tide-island/bin)
+install(PROGRAMS bin/tide-island-setup DESTINATION ${CMAKE_INSTALL_DATADIR}/tide-island/bin)
 
 # Install desktop entry
 install(FILES tide-island.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)

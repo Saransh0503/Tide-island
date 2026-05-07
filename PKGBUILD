@@ -19,6 +19,7 @@ depends=(
     'upower'
     'bluez'
     'bluez-utils'
+    'python'
     'quickshell'
 )
 makedepends=('cmake' 'git')
@@ -51,4 +52,5 @@ package() {
   DESTDIR="$pkgdir" cmake --install build
   chmod +x "$pkgdir/usr/bin/tide-island"
   chmod +x "$pkgdir/usr/share/tide-island/bin/lyricsmpris"
+  chmod +x "$pkgdir/usr/share/tide-island/bin/tide-island-setup"
 }
