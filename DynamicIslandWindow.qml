@@ -45,12 +45,21 @@ PanelWindow {
     color: "transparent"
     anchors { top: true; left: true; right: true }
     mask: Region {
-        // Expand the clickable region horizontally to capture trackpad gestures better
+        // Input is the union of the island's visible surfaces plus a compact top
+        // gesture strip. The gesture strip must not grow with expanded content.
         Region {
             x: 0
             y: 0
             width: root.width
-            height: Math.ceil(mainCapsule.y + mainCapsule.height + 20)
+            height: Math.ceil(root.topGestureInputHeight)
+        }
+
+        Region {
+            intersection: Intersection.Combine
+            x: Math.floor(mainCapsule.x)
+            y: Math.floor(mainCapsule.y)
+            width: Math.ceil(mainCapsule.width)
+            height: Math.ceil(mainCapsule.height)
         }
         
         // Add existing detail shells
@@ -93,6 +102,8 @@ PanelWindow {
         userConfig.dynamicIslandPrimaryButton,
         userConfig.dynamicIslandSecondaryButton
     ])
+    readonly property bool topGestureInputActive: !root.overviewVisible && islandContainer.canShowSideSwipe
+    readonly property real topGestureInputHeight: topGestureInputActive ? root.exclusiveZone : 0
     readonly property real overviewWallpaperScale: 0.18
     readonly property real overviewWallpaperCacheScaleMultiplier: 1.75
     readonly property int overviewWallpaperTargetWidth: {
@@ -2465,6 +2476,7 @@ PanelWindow {
     MouseArea {
         id: rootGestureArea
         anchors.fill: parent
+        enabled: root.topGestureInputActive
         hoverEnabled: false
         acceptedButtons: Qt.NoButton 
         
