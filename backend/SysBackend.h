@@ -10,6 +10,7 @@
 #include <QByteArray>
 #include <QTimer>
 #include <QVariantMap>
+#include <QStringList>
 
 struct udev;
 struct udev_monitor;
@@ -36,7 +37,6 @@ public:
 
 signals:
     void workspaceChanged(int wsId);
-    void capsLockChanged(bool isOn);
     void brightnessChanged(double val);
     void volumeChanged(int volPercentage, bool isMuted);
     void batteryCapacityChanged(int capacity);
@@ -51,11 +51,12 @@ private slots:
     void handleHyprlandData();
     void handleVolumeEvent();
     void fetchCurrentVolume();
+    void handleVolumeQueryFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void handleDefaultSinkQueryFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void handleBatteryMonitorEvent();
     void handleBatteryPropertiesChanged(const QString &interfaceName, const QVariantMap &changedProperties, const QStringList &invalidatedProperties);
     void handleUpowerBatteryChanged();
     void updateBrightness();
-    void updateCapsLock();
     void updateBatterySysfs();
     void updateBatteryUpower();
     void startLyricsBackend();
@@ -71,10 +72,9 @@ private:
     void setupBatteryUpower();
     void setupAudio();
     void setupBrightness();
-    void setupKeyboard();
     void setupLyrics();
-    bool queryBluetoothAudioConnected();
     void checkDefaultAudioDevice();
+    void startTimedProcess(QProcess *process, QTimer *timeoutTimer, const QString &program, const QStringList &arguments);
     void detectPowerSupplyPaths();
     void detectBacklightPath();
     QString readSysfsTextFile(const QString &path) const;
@@ -89,10 +89,13 @@ private:
     QLocalSocket *m_hyprSocket;
     QByteArray m_hyprBuffer;
     QProcess *m_paSubscriber;
+    QProcess *m_volumeQueryProcess;
+    QProcess *m_defaultSinkQueryProcess;
     QFileSystemWatcher *m_brightnessWatcher;
     QSocketNotifier *m_batteryNotifier;
     QTimer *m_audioDebounceTimer;
-    QTimer *m_capsPollTimer;
+    QTimer *m_volumeQueryTimeoutTimer;
+    QTimer *m_defaultSinkQueryTimeoutTimer;
     QProcess *m_lyricsProcess;
     QTimer *m_lyricsRestartTimer;
     double m_maxBrightness;
@@ -110,9 +113,6 @@ private:
     QString m_upowerBatteryPath;
     bool m_hasBatteryState;
 
-    bool m_isBluetoothAudioConnected;
-    bool m_capsLockInitialized;
-    bool m_capsLockOn;
     struct udev *m_udev;
     struct udev_monitor *m_batteryMonitor;
 };

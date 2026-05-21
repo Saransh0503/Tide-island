@@ -134,8 +134,6 @@ QtObject {
         "discharging": "",
         "cpu": "󰍛",
         "ram": "󰘚",
-        "capsLockOn": "",
-        "capsLockOff": "",
         "bluetooth": "󰋋"
     }))
 

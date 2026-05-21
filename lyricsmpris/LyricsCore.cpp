@@ -1,4 +1,5 @@
 #include "LyricsCore.h"
+#include "CjkVariantNormalizer.h"
 
 #include <QJsonDocument>
 #include <QJsonValue>
@@ -25,7 +26,7 @@ enum VersionFlag {
 QString stringValue(const QJsonObject &object, const QString &key) {
     const QJsonValue value = object.value(key);
     if (value.isString()) return value.toString();
-    if (value.isDouble()) return QString::number(value.toInt());
+    if (value.isDouble()) return QString::number(value.toInteger());
     return QString();
 }
 
@@ -55,17 +56,6 @@ QString firstNonEmpty(const QStringList &values) {
         if (!value.trimmed().isEmpty()) return value;
     }
     return QString();
-}
-
-QString normalizeCjkVariants(QString value) {
-    const QString traditional = QStringLiteral("氣傑倫鄧劉風後來闊聽裡裏愛詞編讓難貴葉營擁親輕說願戀記飄夢攪謝準備嗎嚐錯誰飛鋼純樂現場與對這個為萬無聲體會妳臺灣國語簡髮長過開關點畫麥麵黃");
-    const QString simplified = QStringLiteral("气杰伦邓刘风后来阔听里里爱词编让难贵叶营拥亲轻说愿恋记飘梦搅谢准备吗尝错谁飞钢纯乐现场与对这个为万无声体会你台湾国语简发长过开关点画麦面黄");
-
-    for (QChar &character : value) {
-        const qsizetype index = traditional.indexOf(character);
-        if (index >= 0 && index < simplified.size()) character = simplified.at(index);
-    }
-    return value;
 }
 
 bool containsAny(const QString &value, const QStringList &needles) {

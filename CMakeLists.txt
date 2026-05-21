@@ -13,6 +13,8 @@ find_library(UDEV_LIB NAMES udev REQUIRED)
 
 add_executable(lyricsmpris
     lyricsmpris/main.cpp
+    lyricsmpris/CjkVariantNormalizer.h
+    lyricsmpris/CjkVariantNormalizer.cpp
     lyricsmpris/LyricsCore.h
     lyricsmpris/LyricsCore.cpp
     lyricsmpris/LyricsMprisApp.h
@@ -33,6 +35,8 @@ enable_testing()
 
 add_executable(lyricsmpris_tests
     tests/lyricsmpris_core_tests.cpp
+    lyricsmpris/CjkVariantNormalizer.h
+    lyricsmpris/CjkVariantNormalizer.cpp
     lyricsmpris/LyricsCore.h
     lyricsmpris/LyricsCore.cpp
 )

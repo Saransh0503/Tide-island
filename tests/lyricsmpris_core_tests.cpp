@@ -55,12 +55,16 @@ void LyricsMprisCoreTests::keepsPlainLyricsFallback() {
 
 void LyricsMprisCoreTests::filtersPlaceholderLyrics() {
     QVERIFY(parseLyrics("[00:01.00]暂无歌词\n").isEmpty());
+    QVERIFY(parseLyrics("[00:01.00]暫無歌詞\n").isEmpty());
     QVERIFY(parseLyrics("纯音乐，请欣赏\n").isEmpty());
+    QVERIFY(parseLyrics("純音樂，請欣賞\n").isEmpty());
 }
 
 void LyricsMprisCoreTests::normalizesNoisyTitles() {
     QCOMPARE(normalizedTitle("Song Title (feat. Someone) - Remastered 2011"), QString("song title"));
     QCOMPARE(normalizedTitle("HELLO!!! [Official Lyric Video]"), QString("hello"));
+    QCOMPARE(normalizedTitle("告白氣球（現場版）"), QString("告白气球"));
+    QCOMPARE(normalizedArtist("鄧紫棋 G.E.M."), QString("邓紫棋 g e m"));
     QCOMPARE(normalizedArtist("Artist feat. Guest"), QString("artist"));
 }
 
@@ -252,15 +256,25 @@ void LyricsMprisCoreTests::parsesNeteaseSearchShapes() {
                 "ar": [{"name": "周杰伦"}],
                 "al": {"name": "周杰伦的床边故事"},
                 "dt": 215000
+            }, {
+                "name": "玻璃爱",
+                "id": 2682998958,
+                "ar": [{"name": "L8R"}, {"name": "豪一鸽"}, {"name": "xxxmiracle"}],
+                "al": {"name": "玻璃爱"},
+                "dt": 194501
             }]
         }
     })";
     QList<ProviderCandidate> modernCandidates = parseNeteaseSearchJson(modern);
-    QCOMPARE(modernCandidates.size(), 1);
+    QCOMPARE(modernCandidates.size(), 2);
     QCOMPARE(modernCandidates.first().artist, QString("周杰伦"));
     QCOMPARE(modernCandidates.first().album, QString("周杰伦的床边故事"));
     QCOMPARE(modernCandidates.first().durationMs, 215000);
     QCOMPARE(modernCandidates.first().syncedLyrics, QString("12345"));
+    QCOMPARE(modernCandidates.at(1).artist, QString("L8R, 豪一鸽, xxxmiracle"));
+    QCOMPARE(modernCandidates.at(1).album, QString("玻璃爱"));
+    QCOMPARE(modernCandidates.at(1).durationMs, 194501);
+    QCOMPARE(modernCandidates.at(1).syncedLyrics, QString("2682998958"));
 
     const QByteArray encrypted = R"({"result":"35b1748964af8a7c","code":200})";
     QVERIFY(parseNeteaseSearchJson(encrypted).isEmpty());

@@ -14,14 +14,22 @@
 #include <QStandardPaths>
 #include <libudev.h>
 
+namespace {
+constexpr int kCommandTimeoutMs = 500;
+constexpr int kAudioEventDebounceMs = 80;
+}
+
 SysBackend::SysBackend(QObject *parent)
     : QObject(parent),
       m_hyprSocket(nullptr),
       m_paSubscriber(nullptr),
+      m_volumeQueryProcess(nullptr),
+      m_defaultSinkQueryProcess(nullptr),
       m_brightnessWatcher(nullptr),
       m_batteryNotifier(nullptr),
       m_audioDebounceTimer(nullptr),
-      m_capsPollTimer(nullptr),
+      m_volumeQueryTimeoutTimer(nullptr),
+      m_defaultSinkQueryTimeoutTimer(nullptr),
       m_lyricsProcess(nullptr),
       m_lyricsRestartTimer(nullptr),
       m_maxBrightness(1.0),
@@ -34,16 +42,12 @@ SysBackend::SysBackend(QObject *parent)
       m_batteryStatus("Unknown"),
       m_upowerBatteryPath(),
       m_hasBatteryState(false),
-      m_isBluetoothAudioConnected(false),
-      m_capsLockInitialized(false),
-      m_capsLockOn(false),
       m_udev(nullptr),
       m_batteryMonitor(nullptr) {
     setupHyprland();
     setupBattery();
     setupAudio();
     setupBrightness();
-    setupKeyboard();
     setupLyrics();
 }
 
@@ -365,34 +369,78 @@ void SysBackend::handleUpowerBatteryChanged() {
 void SysBackend::setupAudio() {
     m_paSubscriber = new QProcess(this);
     connect(m_paSubscriber, &QProcess::readyReadStandardOutput, this, &SysBackend::handleVolumeEvent);
+
+    m_volumeQueryProcess = new QProcess(this);
+    m_volumeQueryTimeoutTimer = new QTimer(this);
+    m_volumeQueryTimeoutTimer->setSingleShot(true);
+    m_volumeQueryTimeoutTimer->setInterval(kCommandTimeoutMs);
+    connect(m_volumeQueryTimeoutTimer, &QTimer::timeout, this, [this]() {
+        if (m_volumeQueryProcess && m_volumeQueryProcess->state() != QProcess::NotRunning)
+            m_volumeQueryProcess->kill();
+    });
+    connect(m_volumeQueryProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            this, &SysBackend::handleVolumeQueryFinished);
+    connect(m_volumeQueryProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
+        if (m_volumeQueryTimeoutTimer) m_volumeQueryTimeoutTimer->stop();
+    });
+
+    m_defaultSinkQueryProcess = new QProcess(this);
+    m_defaultSinkQueryTimeoutTimer = new QTimer(this);
+    m_defaultSinkQueryTimeoutTimer->setSingleShot(true);
+    m_defaultSinkQueryTimeoutTimer->setInterval(kCommandTimeoutMs);
+    connect(m_defaultSinkQueryTimeoutTimer, &QTimer::timeout, this, [this]() {
+        if (m_defaultSinkQueryProcess && m_defaultSinkQueryProcess->state() != QProcess::NotRunning)
+            m_defaultSinkQueryProcess->kill();
+    });
+    connect(m_defaultSinkQueryProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            this, &SysBackend::handleDefaultSinkQueryFinished);
+    connect(m_defaultSinkQueryProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
+        if (m_defaultSinkQueryTimeoutTimer) m_defaultSinkQueryTimeoutTimer->stop();
+    });
+
+    m_audioDebounceTimer = new QTimer(this);
+    m_audioDebounceTimer->setSingleShot(true);
+    m_audioDebounceTimer->setInterval(kAudioEventDebounceMs);
+    connect(m_audioDebounceTimer, &QTimer::timeout, this, [this]() {
+        fetchCurrentVolume();
+        checkDefaultAudioDevice();
+    });
+
     m_paSubscriber->start("pactl", QStringList() << "subscribe");
     fetchCurrentVolume();
+    checkDefaultAudioDevice();
 }
 
 void SysBackend::handleVolumeEvent() {
     QByteArray output = m_paSubscriber->readAllStandardOutput();
-    qDebug().noquote() << "[Audio Debug] pactl event:" << output.trimmed();//debug
 
     if (output.contains("sink") || output.contains("card") || output.contains("server")) {
-        fetchCurrentVolume();
-        checkDefaultAudioDevice();
+        if (m_audioDebounceTimer) m_audioDebounceTimer->start();
     }
 }
 
 void SysBackend::fetchCurrentVolume() {
-    QProcess wpctl;
-    wpctl.start("wpctl", QStringList() << "get-volume" << "@DEFAULT_AUDIO_SINK@");
-    wpctl.waitForFinished(500);
-    
-    QString output = QString::fromUtf8(wpctl.readAllStandardOutput()).trimmed();
-    qDebug().noquote() << "[Audio Debug] wpctl output:" << output; 
+    startTimedProcess(
+        m_volumeQueryProcess,
+        m_volumeQueryTimeoutTimer,
+        QStringLiteral("wpctl"),
+        QStringList() << QStringLiteral("get-volume") << QStringLiteral("@DEFAULT_AUDIO_SINK@")
+    );
+}
+
+void SysBackend::handleVolumeQueryFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    if (m_volumeQueryTimeoutTimer) m_volumeQueryTimeoutTimer->stop();
+    if (!m_volumeQueryProcess || exitStatus != QProcess::NormalExit || exitCode != 0) return;
+
+    const QString output = QString::fromUtf8(m_volumeQueryProcess->readAllStandardOutput()).trimmed();
 
     if (output.startsWith("Volume:")) {
-        bool isMuted = output.contains("[MUTED]");
-        QString valStr = output.section(' ', 1, 1);
-        int volPercentage = static_cast<int>(valStr.toDouble() * 100);
-        
-        qDebug() << "[Audio Debug] Emitting volumeChanged:" << volPercentage << "Muted:" << isMuted;
+        const bool isMuted = output.contains("[MUTED]");
+        const QString valStr = output.section(' ', 1, 1);
+        bool ok = false;
+        const int volPercentage = static_cast<int>(valStr.toDouble(&ok) * 100);
+        if (!ok) return;
+
         emit volumeChanged(volPercentage, isMuted);
     }
 }
@@ -456,66 +504,36 @@ void SysBackend::updateBrightness() {
     }
 }
 
-// 5. caps lock
-void SysBackend::setupKeyboard() {
-    updateCapsLock();
-    if (!m_capsPollTimer) {
-        m_capsPollTimer = new QTimer(this);
-        m_capsPollTimer->setInterval(200);
-        connect(m_capsPollTimer, &QTimer::timeout, this, &SysBackend::updateCapsLock);
-        m_capsPollTimer->start();
-    }
-}
-
-void SysBackend::updateCapsLock() {
-    QProcess hyprctl;
-    hyprctl.start("hyprctl", QStringList() << "devices" << "-j");
-    if (!hyprctl.waitForFinished(500)) {
-        hyprctl.kill();
-        hyprctl.waitForFinished(100);
-        return;
-    }
-
-    const QByteArray output = hyprctl.readAllStandardOutput();
-    QJsonParseError parseError;
-    const QJsonDocument doc = QJsonDocument::fromJson(output, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) return;
-
-    const QJsonArray keyboards = doc.object().value("keyboards").toArray();
-    bool currentState = false;
-    for (const QJsonValue &keyboardVal : keyboards) {
-        if (keyboardVal.toObject().value("capsLock").toBool()) {
-            currentState = true;
-            break;
-        }
-    }
-
-    if (!m_capsLockInitialized) {
-        m_capsLockOn = currentState;
-        m_capsLockInitialized = true;
-        return;
-    }
-
-    if (currentState != m_capsLockOn) {
-        m_capsLockOn = currentState;
-        emit capsLockChanged(m_capsLockOn);
-    }
-}
-
 void SysBackend::checkDefaultAudioDevice() {
-    QProcess pactl;
-    pactl.start("pactl", QStringList() << "get-default-sink");
-    pactl.waitForFinished(500);
-    
-    QString sinkName = QString::fromUtf8(pactl.readAllStandardOutput()).trimmed();
-    
-    bool isBtNow = sinkName.contains("bluez");
+    startTimedProcess(
+        m_defaultSinkQueryProcess,
+        m_defaultSinkQueryTimeoutTimer,
+        QStringLiteral("pactl"),
+        QStringList() << QStringLiteral("get-default-sink")
+    );
+}
+
+void SysBackend::handleDefaultSinkQueryFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    if (m_defaultSinkQueryTimeoutTimer) m_defaultSinkQueryTimeoutTimer->stop();
+    if (!m_defaultSinkQueryProcess || exitStatus != QProcess::NormalExit || exitCode != 0) return;
+
+    const QString sinkName = QString::fromUtf8(m_defaultSinkQueryProcess->readAllStandardOutput()).trimmed();
+    const bool isBtNow = sinkName.contains("bluez");
 
     if (isBtNow != m_isBluetoothAudio) {
         m_isBluetoothAudio = isBtNow;
-        qDebug() << "[Bluetooth Debug] Default sink:" << sinkName << "-> Is BT:" << m_isBluetoothAudio;
         emit bluetoothChanged(m_isBluetoothAudio);
     }
+}
+
+void SysBackend::startTimedProcess(QProcess *process, QTimer *timeoutTimer, const QString &program, const QStringList &arguments) {
+    if (!process || process->state() != QProcess::NotRunning) return;
+
+    if (timeoutTimer) timeoutTimer->stop();
+    process->setProgram(program);
+    process->setArguments(arguments);
+    process->start();
+    if (timeoutTimer) timeoutTimer->start();
 }
 
 void SysBackend::setupLyrics() {

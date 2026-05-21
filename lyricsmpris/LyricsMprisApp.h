@@ -39,6 +39,7 @@ private slots:
     void refreshPlayers();
     void handleNameOwnerChanged(const QString &name, const QString &oldOwner, const QString &newOwner);
     void handlePropertiesChanged(const QString &interfaceName, const QVariantMap &changedProperties, const QStringList &invalidatedProperties);
+    void handleSeeked(qlonglong positionUs);
     void updatePosition();
     void startFallbackProviders();
     void handleNetworkFinished();
@@ -55,6 +56,7 @@ private:
         QString inlineLyrics;
         qint64 lengthMs = 0;
         qint64 positionMs = 0;
+        QDateTime positionUpdatedAt;
         QDateTime lastActive;
         bool valid = false;
     };
@@ -67,6 +69,8 @@ private:
     void startLookup();
     void chooseActivePlayer();
     void updatePlayer(const QString &service);
+    void requestPlayerPosition(const QString &service);
+    qint64 estimatedPositionMs(const PlayerInfo &player) const;
     void startTrack(const PlayerInfo &player);
     QString trackKeyFor(const PlayerInfo &player) const;
     TrackQuery queryFor(const PlayerInfo &player) const;
@@ -102,6 +106,8 @@ private:
     QTimer m_positionTimer;
     QTimer m_fallbackTimer;
     QHash<QString, PlayerInfo> m_players;
+    QSet<QString> m_pendingPlayerUpdates;
+    QSet<QString> m_pendingPositionRequests;
     QString m_activeService;
     QString m_currentTrackKey;
     PlayerInfo m_currentPlayer;

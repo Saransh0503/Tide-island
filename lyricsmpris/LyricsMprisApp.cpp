@@ -4,9 +4,11 @@
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
-#include <QDBusInterface>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
+#include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QDBusVariant>
 #include <QFile>
@@ -26,6 +28,7 @@ namespace {
 constexpr int kPrimaryFallbackDelayMs = 1800;
 constexpr int kRefreshIntervalMs = 1500;
 constexpr int kPositionIntervalMs = 350;
+constexpr int kDbusTimeoutMs = 1000;
 constexpr int kNetworkTimeoutMs = 7000;
 constexpr int kDownloadCandidateLimit = 5;
 constexpr qsizetype kMaxLocalLyricsSize = 1024 * 1024;
@@ -120,6 +123,13 @@ void LyricsMprisApp::start() {
         QStringLiteral("PropertiesChanged"),
         this,
         SLOT(handlePropertiesChanged(QString,QVariantMap,QStringList)));
+    bus.connect(
+        QString(),
+        QStringLiteral("/org/mpris/MediaPlayer2"),
+        QStringLiteral("org.mpris.MediaPlayer2.Player"),
+        QStringLiteral("Seeked"),
+        this,
+        SLOT(handleSeeked(qlonglong)));
 
     refreshPlayers();
     m_refreshTimer.start();
@@ -175,6 +185,10 @@ void LyricsMprisApp::handlePropertiesChanged(const QString &interfaceName, const
         QTimer::singleShot(0, this, &LyricsMprisApp::refreshPlayers);
 }
 
+void LyricsMprisApp::handleSeeked(qlonglong) {
+    QTimer::singleShot(0, this, &LyricsMprisApp::refreshPlayers);
+}
+
 void LyricsMprisApp::emitStatus(const QString &status) {
     if (status == m_lastStatus) return;
     m_lastStatus = status;
@@ -204,44 +218,97 @@ void LyricsMprisApp::emitLine(const QString &line, bool synced) {
 }
 
 void LyricsMprisApp::updatePlayer(const QString &service) {
-    QDBusInterface properties(
+    if (m_pendingPlayerUpdates.contains(service)) return;
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
         service,
         QStringLiteral("/org/mpris/MediaPlayer2"),
         QStringLiteral("org.freedesktop.DBus.Properties"),
-        QDBusConnection::sessionBus());
-    if (!properties.isValid()) return;
+        QStringLiteral("GetAll"));
+    message.setArguments({QStringLiteral("org.mpris.MediaPlayer2.Player")});
 
-    QDBusMessage reply = properties.call(
-        QStringLiteral("GetAll"),
-        QStringLiteral("org.mpris.MediaPlayer2.Player"));
-    if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) return;
+    m_pendingPlayerUpdates.insert(service);
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message, kDbusTimeoutMs), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher, service]() {
+        m_pendingPlayerUpdates.remove(service);
 
-    QVariantMap propertyMap = qdbus_cast<QVariantMap>(reply.arguments().first());
-    PlayerInfo player = m_players.value(service);
-    player.service = service;
-    player.valid = true;
-    player.playbackStatus = variantToString(propertyMap.value(QStringLiteral("PlaybackStatus")));
-    if (player.playbackStatus == QLatin1String("Playing")) player.lastActive = QDateTime::currentDateTimeUtc();
+        QDBusPendingReply<QVariantMap> reply = *watcher;
+        watcher->deleteLater();
+        if (reply.isError()) return;
 
-    QVariantMap metadata = qdbus_cast<QVariantMap>(unwrapDbusVariant(propertyMap.value(QStringLiteral("Metadata"))));
-    player.title = variantToString(metadata.value(QStringLiteral("xesam:title")));
-    player.artist = variantToStringListText(metadata.value(QStringLiteral("xesam:artist")));
-    player.album = variantToString(metadata.value(QStringLiteral("xesam:album")));
-    player.url = variantToString(metadata.value(QStringLiteral("xesam:url")));
-    player.trackId = variantToString(metadata.value(QStringLiteral("mpris:trackid")));
-    player.lengthMs = variantToLongLong(metadata.value(QStringLiteral("mpris:length"))) / 1000;
-    player.inlineLyrics = variantToString(metadata.value(QStringLiteral("xesam:asText")));
-    if (player.inlineLyrics.isEmpty()) player.inlineLyrics = variantToString(metadata.value(QStringLiteral("xesam:comment")));
+        const QVariantMap propertyMap = reply.value();
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        PlayerInfo player = m_players.value(service);
+        player.service = service;
+        player.valid = true;
+        player.playbackStatus = variantToString(propertyMap.value(QStringLiteral("PlaybackStatus")));
+        if (player.playbackStatus == QLatin1String("Playing")) player.lastActive = now;
 
-    QDBusMessage positionReply = properties.call(
-        QStringLiteral("Get"),
+        const QVariantMap metadata = qdbus_cast<QVariantMap>(unwrapDbusVariant(propertyMap.value(QStringLiteral("Metadata"))));
+        player.title = variantToString(metadata.value(QStringLiteral("xesam:title")));
+        player.artist = variantToStringListText(metadata.value(QStringLiteral("xesam:artist")));
+        player.album = variantToString(metadata.value(QStringLiteral("xesam:album")));
+        player.url = variantToString(metadata.value(QStringLiteral("xesam:url")));
+        player.trackId = variantToString(metadata.value(QStringLiteral("mpris:trackid")));
+        player.lengthMs = variantToLongLong(metadata.value(QStringLiteral("mpris:length"))) / 1000;
+        player.inlineLyrics = variantToString(metadata.value(QStringLiteral("xesam:asText")));
+        if (player.inlineLyrics.isEmpty()) player.inlineLyrics = variantToString(metadata.value(QStringLiteral("xesam:comment")));
+
+        const QVariant position = propertyMap.value(QStringLiteral("Position"));
+        if (position.isValid()) {
+            player.positionMs = variantToLongLong(position) / 1000;
+            player.positionUpdatedAt = now;
+        }
+
+        m_players.insert(service, player);
+        requestPlayerPosition(service);
+        chooseActivePlayer();
+    });
+}
+
+void LyricsMprisApp::requestPlayerPosition(const QString &service) {
+    if (service.isEmpty() || m_pendingPositionRequests.contains(service)) return;
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        service,
+        QStringLiteral("/org/mpris/MediaPlayer2"),
+        QStringLiteral("org.freedesktop.DBus.Properties"),
+        QStringLiteral("Get"));
+    message.setArguments({
         QStringLiteral("org.mpris.MediaPlayer2.Player"),
-        QStringLiteral("Position"));
-    if (positionReply.type() != QDBusMessage::ErrorMessage && !positionReply.arguments().isEmpty()) {
-        player.positionMs = variantToLongLong(positionReply.arguments().first()) / 1000;
-    }
+        QStringLiteral("Position")
+    });
 
-    m_players.insert(service, player);
+    m_pendingPositionRequests.insert(service);
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message, kDbusTimeoutMs), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher, service]() {
+        m_pendingPositionRequests.remove(service);
+
+        QDBusPendingReply<QVariant> reply = *watcher;
+        watcher->deleteLater();
+        if (reply.isError()) return;
+
+        auto it = m_players.find(service);
+        if (it == m_players.end()) return;
+
+        it->positionMs = variantToLongLong(unwrapDbusVariant(reply.value())) / 1000;
+        it->positionUpdatedAt = QDateTime::currentDateTimeUtc();
+
+        if (service == m_activeService) {
+            m_currentPlayer = it.value();
+            updatePosition();
+        }
+    });
+}
+
+qint64 LyricsMprisApp::estimatedPositionMs(const PlayerInfo &player) const {
+    qint64 position = player.positionMs;
+    if (player.playbackStatus == QLatin1String("Playing") && player.positionUpdatedAt.isValid())
+        position += player.positionUpdatedAt.msecsTo(QDateTime::currentDateTimeUtc());
+
+    if (player.lengthMs > 0)
+        position = std::min(position, player.lengthMs);
+    return std::max<qint64>(0, position);
 }
 
 void LyricsMprisApp::chooseActivePlayer() {
@@ -793,25 +860,11 @@ void LyricsMprisApp::updatePosition() {
     PlayerInfo player = m_players.value(m_activeService, m_currentPlayer);
     if (player.service.isEmpty()) player = m_currentPlayer;
 
-    if (!player.service.isEmpty()) {
-        QDBusInterface properties(
-            player.service,
-            QStringLiteral("/org/mpris/MediaPlayer2"),
-            QStringLiteral("org.freedesktop.DBus.Properties"),
-            QDBusConnection::sessionBus());
-        QDBusMessage positionReply = properties.call(
-            QStringLiteral("Get"),
-            QStringLiteral("org.mpris.MediaPlayer2.Player"),
-            QStringLiteral("Position"));
-        if (positionReply.type() != QDBusMessage::ErrorMessage && !positionReply.arguments().isEmpty())
-            player.positionMs = variantToLongLong(positionReply.arguments().first()) / 1000;
-    }
-
-    const QString line = selectLineAt(m_currentDocument, player.positionMs);
+    const QString line = selectLineAt(m_currentDocument, estimatedPositionMs(player));
     emitLine(line, m_currentDocument.hasSyncedLines());
 
     const bool shouldPoll = m_currentDocument.hasSyncedLines()
-        && player.playbackStatus != QLatin1String("Stopped")
+        && player.playbackStatus == QLatin1String("Playing")
         && !m_currentTrackKey.isEmpty();
     if (shouldPoll && !m_positionTimer.isActive()) m_positionTimer.start();
     else if (!shouldPoll && m_positionTimer.isActive()) m_positionTimer.stop();

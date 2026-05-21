@@ -343,14 +343,6 @@ Item {
             brightnessDebounce.restart();
         }
 
-        function onCapsLockChanged(isOn) {
-            root.transientRequested(
-                isOn ? root.statusIcon("capsLockOn") : root.statusIcon("capsLockOff"),
-                -1.0,
-                isOn ? "Caps Lock ON" : "Caps Lock OFF"
-            );
-        }
-
         function onBluetoothChanged(isConnected) {
             root._bluetoothVolumeSuppressed = true;
             bluetoothVolumeSuppressionTimer.restart();
