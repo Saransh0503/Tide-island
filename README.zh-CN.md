@@ -323,6 +323,8 @@ systemctl status bluetooth
 - Discord: https://discord.gg/gEmqgz76
 - Email: enhaoswen@gmail.com
 
+一个卑微的请求: 在发布rice的照片时,能否加上我repo的地址呢? (我的reddit账号被ban了)[哭]
+
 ---
 
 <p align="center">
