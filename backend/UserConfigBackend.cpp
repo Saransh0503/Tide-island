@@ -172,6 +172,11 @@ QString UserConfigBackend::tlpSudoPassword() const
     return m_tlpSudoPassword;
 }
 
+QString UserConfigBackend::tlpPermissionMode() const
+{
+    return m_tlpPermissionMode;
+}
+
 int UserConfigBackend::overviewCloseKey() const
 {
     return m_overviewCloseKey;
@@ -362,6 +367,7 @@ void UserConfigBackend::loadConfig()
     updateField(this, m_heroFontFamily, jsonString(configObject, QLatin1String("heroFontFamily"), QStringLiteral("Inter Display")), &UserConfigBackend::heroFontFamilyChanged);
     updateField(this, m_timeFontFamily, jsonString(configObject, QLatin1String("timeFontFamily"), QStringLiteral("Inter Display")), &UserConfigBackend::timeFontFamilyChanged);
     updateField(this, m_tlpSudoPassword, jsonString(configObject, QLatin1String("tlpSudoPassword"), m_defaultTlpSudoPassword), &UserConfigBackend::tlpSudoPasswordChanged);
+    updateField(this, m_tlpPermissionMode, jsonString(configObject, QLatin1String("tlpPermissionMode"), QStringLiteral("ask")), &UserConfigBackend::tlpPermissionModeChanged);
     updateField(this, m_overviewCloseKey, jsonInt(configObject, QLatin1String("overviewCloseKey"), 16777216), &UserConfigBackend::overviewCloseKeyChanged);
     updateField(this, m_overviewPreviousWorkspaceKey, jsonInt(configObject, QLatin1String("overviewPreviousWorkspaceKey"), 16777234), &UserConfigBackend::overviewPreviousWorkspaceKeyChanged);
     updateField(this, m_overviewNextWorkspaceKey, jsonInt(configObject, QLatin1String("overviewNextWorkspaceKey"), 16777236), &UserConfigBackend::overviewNextWorkspaceKeyChanged);

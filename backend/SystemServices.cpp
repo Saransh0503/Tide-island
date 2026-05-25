@@ -902,16 +902,23 @@ void SystemServices::setTlpMode(const QString &mode, const QString &sudoPassword
     } else
 #endif
     {
-        if (findExecutable(QStringLiteral("sudo")).isEmpty()) {
-            emit tlpSetFinished(false, 126, QString(), QStringLiteral("sudo is not installed."));
-            return;
-        }
-
         const QString password = sudoPassword.trimmed();
-        program = QStringLiteral("sudo");
-        if (password.isEmpty()) {
+        if (password.isEmpty() && !findExecutable(QStringLiteral("pkexec")).isEmpty()) {
+            program = QStringLiteral("pkexec");
+            arguments = {QStringLiteral("tlp"), normalizedMode};
+        } else if (password.isEmpty()) {
+            if (findExecutable(QStringLiteral("sudo")).isEmpty()) {
+                emit tlpSetFinished(false, 126, QString(), QStringLiteral("pkexec or sudo is not installed."));
+                return;
+            }
+            program = QStringLiteral("sudo");
             arguments = {QStringLiteral("-n"), QStringLiteral("tlp"), normalizedMode};
         } else {
+            if (findExecutable(QStringLiteral("sudo")).isEmpty()) {
+                emit tlpSetFinished(false, 126, QString(), QStringLiteral("sudo is not installed."));
+                return;
+            }
+            program = QStringLiteral("sudo");
             arguments = {QStringLiteral("-S"), QStringLiteral("-p"), QString(), QStringLiteral("tlp"), normalizedMode};
             stdinData = (password + QLatin1Char('\n')).toUtf8();
         }

@@ -11,6 +11,7 @@
 #include <QStandardPaths>
 #include <QStringList>
 #include <QTextStream>
+#include <QUrl>
 
 #include <csignal>
 #include <cstdio>
@@ -22,9 +23,19 @@ namespace {
 constexpr auto configDirName = "tide-island";
 constexpr auto configFileName = "userconfig.json";
 constexpr auto setupLockFileName = "setup-wizard.lock";
+constexpr auto wallpaperPathKey = "wallpaperPath";
+constexpr auto tlpSudoPasswordKey = "tlpSudoPassword";
+constexpr auto tlpPermissionModeKey = "tlpPermissionMode";
+constexpr auto hyprlandBindKey = "hyprlandBind";
+constexpr auto hyprlandBindModeKey = "hyprlandBindMode";
 constexpr auto overviewBindCommand = "qs ipc -p /usr/share/tide-island call overview toggle";
 constexpr auto overviewBindLine = "bind = SUPER, TAB, exec, qs ipc -p /usr/share/tide-island call overview toggle";
 constexpr qint64 setupLockMaxAgeSeconds = 60 * 60;
+
+struct SetupStep {
+    QString key;
+    QString label;
+};
 
 QString glyph(char32_t codepoint)
 {
@@ -128,13 +139,14 @@ QJsonObject statusIconsDefaults()
 QJsonObject defaultUserConfig()
 {
     return {
-        {QStringLiteral("wallpaperPath"), QString()},
+        {QString::fromLatin1(wallpaperPathKey), QString()},
         {QStringLiteral("workspaceOverviewWindowRadius"), 12.0},
         {QStringLiteral("iconFontFamily"), QStringLiteral("JetBrainsMono Nerd Font")},
         {QStringLiteral("textFontFamily"), QStringLiteral("Inter Display")},
         {QStringLiteral("heroFontFamily"), QStringLiteral("Inter Display")},
         {QStringLiteral("timeFontFamily"), QStringLiteral("Inter Display")},
-        {QStringLiteral("tlpSudoPassword"), QString()},
+        {QString::fromLatin1(tlpSudoPasswordKey), QString()},
+        {QString::fromLatin1(tlpPermissionModeKey), QString()},
         {QStringLiteral("overviewCloseKey"), 16777216},
         {QStringLiteral("overviewPreviousWorkspaceKey"), 16777234},
         {QStringLiteral("overviewNextWorkspaceKey"), 16777236},
@@ -220,7 +232,7 @@ bool jsonValueHasExpectedType(const QJsonValue &value, const QJsonValue &fallbac
     return !value.isUndefined() && !value.isNull();
 }
 
-void mergeMissingObjectKeys(QJsonObject *target, const QJsonObject &fallback, const QString &prefix, QStringList *missing)
+void mergeObjectDefaults(QJsonObject *target, const QJsonObject &fallback)
 {
     for (auto it = fallback.constBegin(); it != fallback.constEnd(); ++it) {
         const QJsonValue value = target->value(it.key());
@@ -228,13 +240,11 @@ void mergeMissingObjectKeys(QJsonObject *target, const QJsonObject &fallback, co
             continue;
 
         target->insert(it.key(), it.value());
-        missing->append(prefix + QStringLiteral(".") + it.key());
     }
 }
 
-bool mergeMissingUserConfig(QJsonObject *data, QStringList *missing)
+void mergeUserConfigDefaults(QJsonObject *data)
 {
-    bool changed = false;
     const QJsonObject defaults = defaultUserConfig();
     for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
         const QString key = it.key();
@@ -243,12 +253,8 @@ bool mergeMissingUserConfig(QJsonObject *data, QStringList *missing)
 
         if (fallback.isObject() && value.isObject()) {
             QJsonObject object = value.toObject();
-            const int before = missing->size();
-            mergeMissingObjectKeys(&object, fallback.toObject(), QStringLiteral("userconfig.") + key, missing);
-            if (missing->size() != before) {
-                data->insert(key, object);
-                changed = true;
-            }
+            mergeObjectDefaults(&object, fallback.toObject());
+            data->insert(key, object);
             continue;
         }
 
@@ -256,11 +262,7 @@ bool mergeMissingUserConfig(QJsonObject *data, QStringList *missing)
             continue;
 
         data->insert(key, fallback);
-        missing->append(QStringLiteral("userconfig.") + key);
-        changed = true;
     }
-
-    return changed;
 }
 
 QString configString(const QJsonObject &data, const QString &key)
@@ -269,12 +271,26 @@ QString configString(const QJsonObject &data, const QString &key)
     return value.isString() ? value.toString() : QString();
 }
 
+QString cleanInputPath(QString path)
+{
+    path = path.trimmed();
+    path.remove(u'\'');
+    path.remove(u'"');
+
+    const QUrl url(path);
+    if (url.isLocalFile())
+        path = url.toLocalFile();
+
+    return expandUserPath(path);
+}
+
 bool readableFilePath(const QString &path)
 {
-    if (path.trimmed().isEmpty())
+    const QString cleanPath = cleanInputPath(path);
+    if (cleanPath.isEmpty())
         return false;
 
-    const QFileInfo info(expandUserPath(path.trimmed()));
+    const QFileInfo info(cleanPath);
     return info.isFile() && info.isReadable();
 }
 
@@ -393,23 +409,80 @@ bool overviewBindPresent()
     return false;
 }
 
+QString displayPath(const QString &path)
+{
+    const QString home = homePath();
+    if (path == home)
+        return QStringLiteral("~");
+    if (path.startsWith(home + QStringLiteral("/")))
+        return QStringLiteral("~") + path.sliced(home.size());
+    return path;
+}
+
+bool validTlpPermissionMode(const QString &mode)
+{
+    return mode == QStringLiteral("skip")
+        || mode == QStringLiteral("ask")
+        || mode == QStringLiteral("password");
+}
+
 QStringList missingItems(QJsonObject *normalizedConfig = nullptr)
 {
     QJsonObject data = loadUserConfig();
     QStringList missing;
-    mergeMissingUserConfig(&data, &missing);
+    mergeUserConfigDefaults(&data);
 
-    if (!readableFilePath(configString(data, QStringLiteral("wallpaperPath"))))
-        missing.append(QStringLiteral("userconfig.wallpaperPath"));
-    if (configString(data, QStringLiteral("tlpSudoPassword")).isEmpty())
-        missing.append(QStringLiteral("userconfig.tlpSudoPassword"));
-    if (!overviewBindPresent())
-        missing.append(QStringLiteral("hyprlandBind"));
+    QString tlpPermissionMode = configString(data, tlpPermissionModeKey);
+    const QString tlpPassword = configString(data, tlpSudoPasswordKey);
+    if (tlpPermissionMode.isEmpty() && !tlpPassword.isEmpty()) {
+        tlpPermissionMode = QStringLiteral("password");
+        data.insert(tlpPermissionModeKey, tlpPermissionMode);
+    }
+
+    if (!readableFilePath(configString(data, wallpaperPathKey)))
+        missing.append(wallpaperPathKey);
+    if (!validTlpPermissionMode(tlpPermissionMode)
+        || (tlpPermissionMode == QStringLiteral("password") && tlpPassword.isEmpty())) {
+        missing.append(tlpSudoPasswordKey);
+    }
+    if (!overviewBindPresent() && configString(data, hyprlandBindModeKey) != QStringLiteral("manual"))
+        missing.append(hyprlandBindKey);
 
     missing.removeDuplicates();
     if (normalizedConfig)
         *normalizedConfig = data;
     return missing;
+}
+
+QList<SetupStep> setupSteps(const QStringList &missing)
+{
+    const QList<SetupStep> ordered = {
+        {QString::fromLatin1(wallpaperPathKey), QStringLiteral("Wallpaper image")},
+        {QString::fromLatin1(hyprlandBindKey), QStringLiteral("SUPER+TAB Hyprland binding")},
+        {QString::fromLatin1(tlpSudoPasswordKey), QStringLiteral("TLP mode switching password  optional")},
+    };
+
+    QList<SetupStep> result;
+    for (const SetupStep &step : ordered) {
+        if (missing.contains(step.key))
+            result.append(step);
+    }
+    return result;
+}
+
+void printWelcome(const QList<SetupStep> &steps)
+{
+    QTextStream out(stdout);
+    out << "Welcome to Tide Island setup.\n\n";
+    out << "We found a few things that need your attention before Tide Island can start:\n\n";
+
+    for (int index = 0; index < steps.size(); ++index)
+        out << "  " << index + 1 << ". " << steps.at(index).label << "\n";
+
+    out << "\nThis setup will only write to:\n";
+    out << "  " << displayPath(userConfigPath()) << "\n";
+    out << "  " << displayPath(hyprlandConfigPath()) << "  if you allow it\n\n";
+    out << "No system files will be changed.\n";
 }
 
 void printCheck(const QStringList &missing)
@@ -469,7 +542,18 @@ bool setupLockActive()
     return true;
 }
 
-bool writeSetupLock(qint64 pid)
+bool setupInitialPending()
+{
+    const QJsonObject data = readSetupLock();
+    if (!data.value(QStringLiteral("initialSetup")).toBool(false))
+        return false;
+
+    const qint64 createdAt = static_cast<qint64>(data.value(QStringLiteral("createdAt")).toDouble(0));
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    return createdAt > 0 && (now - createdAt) <= setupLockMaxAgeSeconds;
+}
+
+bool writeSetupLock(qint64 pid, bool initialSetup = false)
 {
     const QString path = setupLockPath();
     if (!ensurePrivateConfigDir(path))
@@ -482,6 +566,7 @@ bool writeSetupLock(qint64 pid)
     const QJsonObject data{
         {QStringLiteral("pid"), double(pid)},
         {QStringLiteral("createdAt"), double(QDateTime::currentSecsSinceEpoch())},
+        {QStringLiteral("initialSetup"), initialSetup},
     };
     file.write(QJsonDocument(data).toJson(QJsonDocument::Compact));
     file.write("\n");
@@ -529,44 +614,99 @@ QString readHiddenLine(const QString &prompt)
     return value;
 }
 
-void promptWallpaper(QJsonObject *data)
+void printStepHeader(QTextStream &out, int step, int total, const QString &title)
+{
+    out << "\nStep " << step << "/" << total << ": " << title << "\n\n";
+}
+
+bool confirmYes(const QString &prompt)
 {
     QTextStream out(stdout);
-    out << "\nWallpaper path\n";
-    out << "This image is used as the workspace overview background and preview wallpaper.\n";
+    while (true) {
+        const QString answer = readLine(prompt).trimmed().toLower();
+        if (answer.isEmpty() && std::feof(stdin))
+            return false;
+        if (answer.isEmpty())
+            return true;
+        if (answer == QStringLiteral("y") || answer == QStringLiteral("yes"))
+            return true;
+        if (answer == QStringLiteral("n") || answer == QStringLiteral("no"))
+            return false;
+        out << "Please enter y or n.\n";
+    }
+}
 
-    const QString current = configString(*data, QStringLiteral("wallpaperPath"));
+void promptWallpaper(QJsonObject *data, int step, int total)
+{
+    QTextStream out(stdout);
+    printStepHeader(out, step, total, QStringLiteral("Wallpaper"));
+    out << "Tide Island uses this image for the workspace overview background.\n";
+    out << "You can also change it in " << displayPath(userConfigPath()) << "\n\n";
+
+    const QString current = configString(*data, wallpaperPathKey);
     if (!current.isEmpty())
-        out << "Current value is not usable: " << current << '\n';
+        out << "Current value is not usable:\n  " << current << "\n\n";
     out.flush();
 
     while (true) {
-        const QString value = readLine(QStringLiteral("Enter a readable wallpaper image path: ")).remove(u'\'').remove(u'"');
+        const QString value = readLine(QStringLiteral("Enter an image path: "));
         if (value.isEmpty() && std::feof(stdin))
             return;
 
-        const QFileInfo path(expandUserPath(value));
+        const QString cleanPath = cleanInputPath(value);
+        const QFileInfo path(cleanPath);
         if (!value.isEmpty() && path.isFile() && path.isReadable()) {
-            data->insert(QStringLiteral("wallpaperPath"), path.absoluteFilePath());
+            data->insert(wallpaperPathKey, path.absoluteFilePath());
             saveUserConfig(*data);
-            out << "Saved wallpaperPath.\n";
+            out << "Saved wallpaper path.\n";
             return;
         }
 
+        if (!cleanPath.isEmpty())
+            out << "Checked: " << cleanPath << "\n";
         out << "That path does not exist or is not readable. Please try again.\n";
     }
 }
 
-void promptTlpPassword(QJsonObject *data)
+void promptTlpPermissions(QJsonObject *data, int step, int total)
 {
     QTextStream out(stdout);
-    out << "\nTLP sudo password\n";
-    out << "This password is only used by the control center to run sudo -S tlp <mode> when switching TLP modes.\n";
-    out << "Tide Island will not use it to install files, change system configuration, run other sudo commands, or do anything unrelated to TLP mode switching.\n";
+    printStepHeader(out, step, total, QStringLiteral("TLP permissions"));
+    out << "Tide Island can switch TLP modes from the control center.\n\n";
+    out << "We promise we won't use your password to do anything unrelated to this.\n\n";
+    out << "Choose how you want to handle permissions:\n\n";
+    out << "  1. Skip this feature for now\n";
+    out << "  2. Ask for password when needed\n";
+    out << "  3. Input password\n\n";
     out.flush();
 
     while (true) {
-        const QString first = readHiddenLine(QStringLiteral("Enter your sudo password (input is hidden): "));
+        const QString choice = readLine(QStringLiteral("Enter 1, 2, or 3: ")).trimmed();
+        if (choice.isEmpty() && std::feof(stdin))
+            return;
+
+        if (choice == QStringLiteral("1")) {
+            data->insert(tlpPermissionModeKey, QStringLiteral("skip"));
+            data->insert(tlpSudoPasswordKey, QString());
+            saveUserConfig(*data);
+            out << "Skipped TLP mode switching for now.\n";
+            return;
+        }
+
+        if (choice == QStringLiteral("2")) {
+            data->insert(tlpPermissionModeKey, QStringLiteral("ask"));
+            data->insert(tlpSudoPasswordKey, QString());
+            saveUserConfig(*data);
+            out << "Tide Island will ask for permission when needed.\n";
+            return;
+        }
+
+        if (choice != QStringLiteral("3")) {
+            out << "Choose 1, 2, or 3.\n";
+            continue;
+        }
+
+        const QString first = readHiddenLine(QStringLiteral("Enter your sudo password: "));
         if (first.isEmpty() && std::feof(stdin))
             return;
 
@@ -577,9 +717,10 @@ void promptTlpPassword(QJsonObject *data)
 
         const QString second = readHiddenLine(QStringLiteral("Enter it again to confirm: "));
         if (first == second) {
-            data->insert(QStringLiteral("tlpSudoPassword"), first);
+            data->insert(tlpPermissionModeKey, QStringLiteral("password"));
+            data->insert(tlpSudoPasswordKey, first);
             saveUserConfig(*data);
-            out << "Saved tlpSudoPassword.\n";
+            out << "Saved TLP sudo password.\n";
             return;
         }
 
@@ -619,40 +760,64 @@ bool appendHyprlandBind(QString *errorMessage)
     return true;
 }
 
-void configureHyprlandBind()
+bool reloadHyprland()
 {
-    QTextStream out(stdout);
-    out << "\nHyprland SUPER+TAB overview binding\n";
-    out << "This binding lets SUPER+TAB call Tide Island's overview toggle to open or close the workspace overview.\n";
-
-    QString errorMessage;
-    const bool changed = appendHyprlandBind(&errorMessage);
-    if (!changed && !errorMessage.isEmpty()) {
-        out << "Could not write to " << hyprlandConfigPath() << ": " << errorMessage << '\n';
-        return;
-    }
-
-    if (!changed) {
-        out << "The Hyprland binding already exists.\n";
-        return;
-    }
-
-    out << "Appended to " << hyprlandConfigPath() << ":\n";
-    out << overviewBindLine << '\n';
-
     QProcess reloadProcess;
     reloadProcess.setProgram(QStringLiteral("hyprctl"));
     reloadProcess.setArguments({QStringLiteral("reload")});
     reloadProcess.setStandardOutputFile(QProcess::nullDevice());
     reloadProcess.setStandardErrorFile(QProcess::nullDevice());
     reloadProcess.start();
-    const bool reloadSucceeded = reloadProcess.waitForFinished(5000)
+    return reloadProcess.waitForFinished(5000)
         && reloadProcess.exitStatus() == QProcess::NormalExit
         && reloadProcess.exitCode() == 0;
-    if (reloadSucceeded)
-        out << "Ran hyprctl reload.\n";
+}
+
+void printManualHyprlandBind(QTextStream &out)
+{
+    out << "You can add this manually:\n\n";
+    out << "  " << overviewBindLine << "\n";
+}
+
+void configureHyprlandBind(QJsonObject *data, int step, int total)
+{
+    QTextStream out(stdout);
+    printStepHeader(out, step, total, QStringLiteral("Hyprland binding"));
+    out << "Tide Island can use SUPER+TAB to toggle the workspace overview.\n\n";
+    out << "The following line can be added to:\n";
+    out << "  " << displayPath(hyprlandConfigPath()) << "\n\n";
+    out << "  " << overviewBindLine << "\n\n";
+    out.flush();
+
+    if (!confirmYes(QStringLiteral("Add it automatically? [Y/n] "))) {
+        out << "\nNo problem. Add this line manually when you're ready:\n\n";
+        out << "  " << overviewBindLine << "\n";
+        data->insert(hyprlandBindModeKey, QStringLiteral("manual"));
+        saveUserConfig(*data);
+        return;
+    }
+
+    QString errorMessage;
+    const bool changed = appendHyprlandBind(&errorMessage);
+    if (!changed && !errorMessage.isEmpty()) {
+        out << "\nTide Island could not edit your Hyprland config.\n\n";
+        printManualHyprlandBind(out);
+        out << "\nDetails: " << errorMessage << "\n";
+        data->insert(hyprlandBindModeKey, QStringLiteral("manual"));
+        saveUserConfig(*data);
+        return;
+    }
+
+    if (!changed) {
+        out << "\nThe SUPER+TAB binding already exists.\n";
+        return;
+    }
+
+    out << "\nAdded the SUPER+TAB binding.\n";
+    if (reloadHyprland())
+        out << "Reloaded Hyprland.\n";
     else
-        out << "Could not reload Hyprland automatically. Run hyprctl reload manually, or log out and back in.\n";
+        out << "Hyprland did not reload automatically. Run hyprctl reload manually, or log out and back in.\n";
 }
 
 QString executablePath()
@@ -697,6 +862,7 @@ QStringList terminalCommand(QStringList base)
 
 int launchWizard()
 {
+    const bool initialSetup = !QFileInfo::exists(userConfigPath()) || setupInitialPending();
     QJsonObject normalized;
     const QStringList missing = missingItems(&normalized);
     if (missing.isEmpty()) {
@@ -708,6 +874,9 @@ int launchWizard()
 
     if (setupLockActive())
         return 0;
+
+    if (initialSetup)
+        writeSetupLock(QCoreApplication::applicationPid(), true);
 
     QList<QStringList> candidates;
     const QString terminal = envString("TERMINAL");
@@ -731,7 +900,7 @@ int launchWizard()
         if (!QProcess::startDetached(command.first(), command.mid(1), QString(), &pid))
             continue;
 
-        writeSetupLock(pid);
+        writeSetupLock(pid, initialSetup);
         return 0;
     }
 
@@ -743,35 +912,38 @@ int launchWizard()
 
 int runWizard()
 {
-    writeSetupLock(QCoreApplication::applicationPid());
+    const bool initialSetup = !QFileInfo::exists(userConfigPath())
+        || readSetupLock().value(QStringLiteral("initialSetup")).toBool(false);
+    writeSetupLock(QCoreApplication::applicationPid(), initialSetup);
     QJsonObject data;
     QStringList missing = missingItems(&data);
     if (missing.isEmpty()) {
         clearSetupLock();
-        QTextStream(stdout) << "Tide Island setup is already complete.\n";
+        QTextStream(stdout) << "All complete.\n";
         return 0;
     }
 
     saveUserConfig(data);
 
+    const QList<SetupStep> steps = setupSteps(missing);
+    if (initialSetup)
+        printWelcome(steps);
+
+    for (int index = 0; index < steps.size(); ++index) {
+        const SetupStep &step = steps.at(index);
+        const int stepNumber = index + 1;
+        const int stepTotal = steps.size();
+
+        if (step.key == QString::fromLatin1(wallpaperPathKey)) {
+            promptWallpaper(&data, stepNumber, stepTotal);
+        } else if (step.key == QString::fromLatin1(tlpSudoPasswordKey)) {
+            promptTlpPermissions(&data, stepNumber, stepTotal);
+        } else if (step.key == QString::fromLatin1(hyprlandBindKey)) {
+            configureHyprlandBind(&data, stepNumber, stepTotal);
+        }
+    }
+
     QTextStream out(stdout);
-    out << "Tide Island setup\n";
-    out << "Missing config keys are filled with defaults. Interactive prompts only appear for values that need local input.\n";
-    out.flush();
-
-    if (missing.contains(QStringLiteral("userconfig.wallpaperPath"))) {
-        promptWallpaper(&data);
-        missing = missingItems(&data);
-    }
-
-    if (missing.contains(QStringLiteral("userconfig.tlpSudoPassword"))) {
-        promptTlpPassword(&data);
-        missing = missingItems(&data);
-    }
-
-    if (missing.contains(QStringLiteral("hyprlandBind")))
-        configureHyprlandBind();
-
     missing = missingItems(&data);
     saveUserConfig(data);
     clearSetupLock();
@@ -805,9 +977,12 @@ int main(int argc, char **argv)
 
     const QString arg = args.first();
     if (arg == QStringLiteral("--check")) {
+        const bool initialSetup = !QFileInfo::exists(userConfigPath());
         QJsonObject normalized;
         const QStringList missing = missingItems(&normalized);
         saveUserConfig(normalized);
+        if (initialSetup && !missing.isEmpty())
+            writeSetupLock(QCoreApplication::applicationPid(), true);
         printCheck(missing);
         return missing.isEmpty() ? 0 : 1;
     }

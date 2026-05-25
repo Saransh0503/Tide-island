@@ -24,6 +24,7 @@ class UserConfigBackend final : public QObject {
     Q_PROPERTY(QString heroFontFamily READ heroFontFamily NOTIFY heroFontFamilyChanged FINAL)
     Q_PROPERTY(QString timeFontFamily READ timeFontFamily NOTIFY timeFontFamilyChanged FINAL)
     Q_PROPERTY(QString tlpSudoPassword READ tlpSudoPassword NOTIFY tlpSudoPasswordChanged FINAL)
+    Q_PROPERTY(QString tlpPermissionMode READ tlpPermissionMode NOTIFY tlpPermissionModeChanged FINAL)
 
     Q_PROPERTY(int overviewCloseKey READ overviewCloseKey NOTIFY overviewCloseKeyChanged FINAL)
     Q_PROPERTY(int overviewPreviousWorkspaceKey READ overviewPreviousWorkspaceKey NOTIFY overviewPreviousWorkspaceKeyChanged FINAL)
@@ -60,6 +61,7 @@ public:
     QString heroFontFamily() const;
     QString timeFontFamily() const;
     QString tlpSudoPassword() const;
+    QString tlpPermissionMode() const;
     int overviewCloseKey() const;
     int overviewPreviousWorkspaceKey() const;
     int overviewNextWorkspaceKey() const;
@@ -96,6 +98,7 @@ signals:
     void heroFontFamilyChanged();
     void timeFontFamilyChanged();
     void tlpSudoPasswordChanged();
+    void tlpPermissionModeChanged();
     void overviewCloseKeyChanged();
     void overviewPreviousWorkspaceKeyChanged();
     void overviewNextWorkspaceKeyChanged();
@@ -131,6 +134,7 @@ private:
     QString m_heroFontFamily = QStringLiteral("Inter Display");
     QString m_timeFontFamily = QStringLiteral("Inter Display");
     QString m_tlpSudoPassword;
+    QString m_tlpPermissionMode = QStringLiteral("ask");
     int m_overviewCloseKey = 16777216;
     int m_overviewPreviousWorkspaceKey = 16777234;
     int m_overviewNextWorkspaceKey = 16777236;
