@@ -23,16 +23,16 @@ Item {
     readonly property bool hasCustomLeftItems: customLeftItems.length > 0
     readonly property string systemServicesClientId: "island-system-state-" + Math.random().toString(36).slice(2)
     readonly property string defaultStatusIcon: "\ud83c\udfa7"
-    readonly property string volumeStatusIcon: "\uf057e"
-    readonly property string muteStatusIcon: "\uf075f"
-    readonly property string brightnessLowStatusIcon: "\uf00de"
-    readonly property string brightnessMediumStatusIcon: "\uf00df"
-    readonly property string brightnessHighStatusIcon: "\uf00e0"
+    readonly property string volumeStatusIcon: "\u{F057E}"
+    readonly property string muteStatusIcon: "\u{F075F}"
+    readonly property string brightnessLowStatusIcon: "\u{F00DE}"
+    readonly property string brightnessMediumStatusIcon: "\u{F00DF}"
+    readonly property string brightnessHighStatusIcon: "\u{F00E0}"
     readonly property string chargingStatusIcon: "\uf0e7"
     readonly property string dischargingStatusIcon: "\uf244"
-    readonly property string cpuStatusIcon: "\uf035b"
-    readonly property string ramStatusIcon: "\uf061a"
-    readonly property string bluetoothStatusIcon: "\uf02cb"
+    readonly property string cpuStatusIcon: "\u{F035B}"
+    readonly property string ramStatusIcon: "\u{F061A}"
+    readonly property string bluetoothStatusIcon: "\u{F02CB}"
 
     property int batteryCapacity: SysBackend.batteryCapacity
     property bool isCharging: SysBackend.batteryStatus === "Charging" || SysBackend.batteryStatus === "Full"

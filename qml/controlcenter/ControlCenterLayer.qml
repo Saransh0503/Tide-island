@@ -100,8 +100,8 @@ Item {
     readonly property string wifiGlyph: ""
     readonly property string bluetoothGlyph: ""
     readonly property string chargingIconGlyph: "\uf0e7"
-    readonly property string brightnessIconGlyph: "\uf00df"
-    readonly property string volumeIconGlyph: "\uf057e"
+    readonly property string brightnessIconGlyph: "\u{F00DF}"
+    readonly property string volumeIconGlyph: "\u{F057E}"
     readonly property var batteryModeGlyphs: ["", "", ""]
     readonly property real batteryDrawerHandleHeight: 20
     readonly property real batteryDrawerContentGap: 8
