@@ -602,6 +602,8 @@ Item {
                         property bool workspaceAtBottom: workspaceRowIndex === root.rows - 1
                         property bool settlingAfterDrop: false
                         property int settleTargetWorkspace: -1
+                        property real lastDragMouseX: 0
+                        property real lastDragMouseY: 0
 
                         windowData: root.hyprlandData && root.hyprlandData.windowByAddress
                             ? root.hyprlandData.windowByAddress[address]
@@ -730,10 +732,8 @@ Item {
                             property bool draggingWindow: false
 
                             onPressed: (mouse) => {
-                                if (!windowTile.pointInsideWorkspace(mouse.x, mouse.y)) {
-                                    mouse.accepted = false;
+                                if (!windowTile.pointInsideWorkspace(mouse.x, mouse.y))
                                     return;
-                                }
 
                                 root.pressedAddress = windowTile.address;
                                 if (mouse.button !== userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton))
@@ -759,10 +759,20 @@ Item {
                                 if (!draggingWindow || !(pressedButtons & userConfig.mouseButton(userConfig.workspaceOverviewWindowDragButton)))
                                     return;
 
-                                root.draggingTargetWorkspace = root.workspaceAtPoint(
-                                    windowTile.x + windowTile.width / 2,
-                                    windowTile.y + windowTile.height / 2
-                                );
+                                windowTile.lastDragMouseX = windowTile.x + mouseX;
+                                windowTile.lastDragMouseY = windowTile.y + mouseY;
+
+                                const isFloating = windowTile.windowData && windowTile.windowData.floating;
+                                if (!isFloating)
+                                    root.draggingTargetWorkspace = root.workspaceAtPoint(
+                                        windowTile.lastDragMouseX,
+                                        windowTile.lastDragMouseY
+                                    );
+                                else
+                                    root.draggingTargetWorkspace = root.workspaceAtPoint(
+                                        windowTile.x + windowTile.width / 2,
+                                        windowTile.y + windowTile.height / 2
+                                    );
 
                                 if (!movedWindow) {
                                     movedWindow = Math.abs(windowTile.x - windowTile.initX) > 4
@@ -777,10 +787,26 @@ Item {
                                     return;
 
                                 draggingWindow = false;
-                                const targetWorkspace = root.workspaceAtPoint(
-                                    windowTile.x + windowTile.width / 2,
-                                    windowTile.y + windowTile.height / 2
-                                );
+
+                                const isFloating = windowTile.windowData && windowTile.windowData.floating;
+                                let targetWorkspace;
+                                if (isFloating) {
+                                    targetWorkspace = root.workspaceAtPoint(
+                                        windowTile.x + windowTile.width / 2,
+                                        windowTile.y + windowTile.height / 2
+                                    );
+                                } else {
+                                    targetWorkspace = root.workspaceAtPoint(
+                                        windowTile.lastDragMouseX,
+                                        windowTile.lastDragMouseY
+                                    );
+                                    if (targetWorkspace === -1)
+                                        targetWorkspace = root.workspaceAtPoint(
+                                            windowTile.x + windowTile.width / 2,
+                                            windowTile.y + windowTile.height / 2
+                                        );
+                                }
+
                                 const movingToWorkspace = targetWorkspace !== -1
                                     && windowTile.windowData
                                     && windowTile.windowData.workspace
@@ -789,19 +815,39 @@ Item {
                                     && movedWindow
                                     && windowTile.windowData
                                     && windowTile.windowData.floating;
-                                const dropPosition = movingToWorkspace || movingFloating
-                                    ? root.floatingWindowPosition(windowTile, movingToWorkspace ? targetWorkspace : windowTile.workspaceId)
-                                    : null;
+
+                                windowTile.Drag.active = false;
 
                                 if (movingToWorkspace) {
-                                    root.setWindowMoveHint(windowTile.address, targetWorkspace, dropPosition.x, dropPosition.y);
+                                    if (isFloating) {
+                                        const dropPosition = root.floatingWindowPosition(windowTile, targetWorkspace);
+                                        root.setWindowMoveHint(windowTile.address, targetWorkspace, dropPosition.x, dropPosition.y);
+                                    } else {
+                                        root.setWindowMoveHint(windowTile.address, targetWorkspace);
+                                    }
                                     windowTile.beginSettle(targetWorkspace);
                                 } else if (movingFloating) {
+                                    const dropPosition = root.floatingWindowPosition(windowTile, windowTile.workspaceId);
                                     root.setWindowMoveHint(windowTile.address, windowTile.workspaceId, dropPosition.x, dropPosition.y);
                                     windowTile.beginSettle(windowTile.workspaceId);
                                 }
 
-                                windowTile.Drag.active = false;
+                                if (movingToWorkspace && !isFloating) {
+                                    const targetOffset = root.workspaceOffset(targetWorkspace);
+                                    const visualX = root.clampNumber(
+                                        windowTile.x,
+                                        targetOffset.x,
+                                        targetOffset.x + Math.max(0, root.workspaceImplicitWidth - windowTile.width)
+                                    );
+                                    const visualY = root.clampNumber(
+                                        windowTile.y,
+                                        targetOffset.y,
+                                        targetOffset.y + Math.max(0, root.workspaceImplicitHeight - windowTile.height)
+                                    );
+                                    windowTile.x = visualX;
+                                    windowTile.y = visualY;
+                                }
+
                                 root.draggingFromWorkspace = -1;
                                 root.draggingTargetWorkspace = -1;
                                 if (root.draggingAddress === windowTile.address)
@@ -809,9 +855,12 @@ Item {
 
                                 if (movingToWorkspace) {
                                     hyprDispatch.moveWindowToWorkspace(windowTile.address, targetWorkspace, false);
-                                    if (windowTile.windowData.floating)
+                                    if (isFloating) {
+                                        const dropPosition = root.floatingWindowPosition(windowTile, targetWorkspace);
                                         hyprDispatch.moveWindowToPosition(windowTile.address, dropPosition.x, dropPosition.y, false);
+                                    }
                                 } else if (movingFloating) {
+                                    const dropPosition = root.floatingWindowPosition(windowTile, windowTile.workspaceId);
                                     hyprDispatch.moveWindowToPosition(windowTile.address, dropPosition.x, dropPosition.y, false);
                                 } else {
                                     restoreTilePosition.restart();
@@ -833,10 +882,6 @@ Item {
                             onClicked: (mouse) => {
                                 if (!windowTile.windowData)
                                     return;
-                                if (!windowTile.pointInsideWorkspace(mouse.x, mouse.y)) {
-                                    mouse.accepted = false;
-                                    return;
-                                }
                                 if (movedWindow) {
                                     movedWindow = false;
                                     return;
