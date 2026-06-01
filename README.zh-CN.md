@@ -241,6 +241,59 @@ tide-island-setup --wizard
 
 ## 配置
 
+可以根据自己的喜好在 `~/.config/tide-island/userconfig.json`配置tide island.
+
+| 选项 | 含义 | 类型 | 默认值 |
+|---|---|---|---|
+| `wallpaperPath` | 工作区概览背景壁纸路径 | string | `""` |
+| `iconFontFamily` | 灵动岛图标字体 | string | `"JetBrainsMono Nerd Font"` |
+| `textFontFamily` | 通用正文字体 | string | `"Inter Display"` |
+| `heroFontFamily` | 大标题字体（歌曲名、控制中心标题等） | string | `"Inter Display"` |
+| `timeFontFamily` | 时间显示字体 | string | `"Inter Display"` |
+| `tlpPermissionMode` | TLP 省电模式切换的提权方式 | string | `"ask"` |
+| `tlpSudoPassword` | `tlpPermissionMode` 为 `"password"` 时使用的 sudo 密码 | string | `""` |
+| `overviewGlobalShortcutAppid` | 工作区概览全局快捷键的 App ID | string | `"quickshell"` |
+| `overviewGlobalShortcutName` | 工作区概览全局快捷键名称 | string | `"dynamic-island-overview"` |
+| `workspaceOverviewWindowDragButton` | 工作区概览中拖拽窗口的鼠标按键 | int | `1`（左键） |
+| `dynamicIslandPrimaryButton` | 点击灵动岛胶囊的主鼠标按键 | int | `1`（左键） |
+| `dynamicIslandPrimaryAction` | 主按键点击灵动岛触发的操作 | string | `"toggleExpandedPlayer"` |
+| `dynamicIslandSecondaryButton` | 点击灵动岛胶囊的副鼠标按键 | int | `3`（右键） |
+| `dynamicIslandSecondaryAction` | 副按键点击灵动岛触发的操作 | string | `"toggleControlCenter"` |
+| `dynamicIslandLeftSwipeItems` | 左滑灵动岛胶囊时显示的信息卡片 | array | `["cava", "battery"]` |
+| `disableAutoExpandOnTrackChange` | 切歌时不自动展开音乐播放器 | bool | `false` |
+
+<br>
+
+也可以修改按键绑定
+
+| 动作 | 行为 |
+|---|---|
+| `""` / `"none"` | 无操作 |
+| `"toggleExpandedPlayer"` | 展开/收起音乐播放器 |
+| `"openExpandedPlayer"` | 展开音乐播放器 |
+| `"closeExpandedPlayer"` | 收起音乐播放器 |
+| `"toggleControlCenter"` | 展开/收起控制中心 |
+| `"openControlCenter"` | 展开控制中心 |
+| `"closeControlCenter"` | 收起控制中心 |
+| `"toggleOverview"` | 展开/收起工作区概览 |
+| `"openOverview"` | 展开工作区概览 |
+| `"closeOverview"` | 收起工作区概览 |
+| `"toggleLyrics"` | 展开/收起歌词胶囊 |
+| `"showLyrics"` | 展开歌词胶囊 |
+| `"showTime"` | 展开时间胶囊 |
+| `"restoreRestingCapsule"` | 恢复灵动岛默认状态 |
+
+例子:
+```
+"dynamicIslandPrimaryButton": 1,
+"dynamicIslandPrimaryAction": "toggleExpandedPlayer",
+"dynamicIslandSecondaryButton": 3,
+"dynamicIslandSecondaryAction": "toggleControlCenter"
+```
+1 = 左键, 2 = 中键, 3 = 右键
+
+<br>
+
 默认用户配置文件位于：
 
 ```text
