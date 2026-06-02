@@ -295,9 +295,9 @@ tide-island-setup --wizard
 <br>
 
 ## 快携键
-Not required, you can adjust based on your preferences.
+非必要,可根据自己的喜好选择或修改
 
-Shortcuts for ~/.config/hypr/hyprland.conf.
+`~/.config/hypr/hyprland.conf` 命令.
 
 ```
 bind = $mainMod, right, exec, qs ipc -p /usr/share/tide-island call tide showLyrics
@@ -307,7 +307,7 @@ bind = $mainMod, M, exec, qs ipc -p /usr/share/tide-island call tide togglePlaye
 bind = $mainMod, C, exec, qs ipc -p /usr/share/tide-island call tide toggleControlCenter
 ```
 
-Shortcuts for ~/.config/hypr/hyprland.lua.
+`~/.config/hypr/hyprland.lua` 命令.
 
 ```
 hyprland.bind("SUPER", "right", "exec", "qs ipc -p /usr/share/tide-island call tide showLyrics")
