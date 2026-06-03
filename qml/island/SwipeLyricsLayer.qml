@@ -38,6 +38,8 @@ Item {
     readonly property real dragDistance: Math.max(lyricEntryDistance, timeExitDistance)
     readonly property real lyricX: centeredX - (1 - clampedProgress) * dragDistance
     readonly property real timeX: centeredX + clampedProgress * dragDistance
+    readonly property real lyricBaselineY: lyricBaselineGuide.y + lyricBaselineGuide.baselineOffset
+    readonly property real timeBaselineY: timeBaselineGuide.y + timeBaselineGuide.baselineOffset
     readonly property real visibleLyricWidth: Math.min(textWidth, Math.max(0, lyricMetrics.advanceWidth))
     readonly property real visibleTimeWidth: Math.min(textWidth, Math.max(0, timeMetrics.advanceWidth))
     readonly property real timeRecordingDotX: Math.max(
@@ -109,6 +111,30 @@ Item {
         text: timeText
     }
 
+    Text {
+        id: lyricBaselineGuide
+        anchors.verticalCenter: parent.verticalCenter
+        text: "Ag国"
+        opacity: 0
+        font.pixelSize: textPixelSize
+        font.family: textFontFamily
+        font.weight: Font.DemiBold
+        font.letterSpacing: -0.15
+        wrapMode: Text.NoWrap
+    }
+
+    Text {
+        id: timeBaselineGuide
+        anchors.verticalCenter: parent.verticalCenter
+        text: "00:00"
+        opacity: 0
+        font.pixelSize: textPixelSize + 1
+        font.family: timeFontFamily
+        font.weight: Font.Bold
+        font.letterSpacing: -0.25
+        wrapMode: Text.NoWrap
+    }
+
     SequentialAnimation {
         id: lyricChangeAnimation
 
@@ -129,9 +155,8 @@ Item {
     Text {
         visible: previousLyricText !== ""
         x: lyricX
+        y: lyricBaselineY - baselineOffset - 14 * lyricChangeProgress
         width: textWidth
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -14 * lyricChangeProgress
         text: previousLyricText
         color: "white"
         opacity: clampedProgress * (1 - lyricChangeProgress)
@@ -147,9 +172,8 @@ Item {
     Text {
         visible: activeLyricText !== ""
         x: lyricX
+        y: lyricBaselineY - baselineOffset + (previousLyricText !== "" ? 12 * (1 - lyricChangeProgress) : 0)
         width: textWidth
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: previousLyricText !== "" ? 12 * (1 - lyricChangeProgress) : 0
         text: activeLyricText
         color: "white"
         opacity: clampedProgress * (previousLyricText !== "" ? lyricChangeProgress : 1)
@@ -165,8 +189,8 @@ Item {
     Text {
         visible: timeText !== "" && showSecondaryText
         x: timeX
+        y: timeBaselineY - baselineOffset
         width: textWidth
-        anchors.verticalCenter: parent.verticalCenter
         text: timeText
         color: "white"
         opacity: 1 - clampedProgress
