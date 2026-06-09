@@ -408,9 +408,6 @@ Thanks to:
 - Discord: https://discord.gg/gEmqgz76
 - Email: enhaoswen@gmail.com
 
-
-A humble request: if you post photos of the rice, could you include my repo link? (My Reddit account got suspended).
-
 ---
 
 <p align="center">
