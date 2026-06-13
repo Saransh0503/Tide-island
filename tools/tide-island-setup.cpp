@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QStringList>
@@ -156,9 +157,35 @@ QJsonObject loadUserConfig()
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return {};
 
-    const QByteArray bytes = file.readAll();
+    QByteArray bytes = file.readAll();
     if (bytes.trimmed().isEmpty())
         return {};
+
+    // Strip JSONC comments before parsing
+    {
+        QString text = QString::fromUtf8(bytes);
+        // Block comments /* ... */
+        static const QRegularExpression blockRe(QStringLiteral("/\\*.*?\\*/"),
+            QRegularExpression::DotMatchesEverythingOption);
+        text.replace(blockRe, QString());
+        // Line comments //
+        const QStringList lines = text.split(u'\n');
+        QStringList stripped;
+        bool inString = false;
+        for (const QString &line : lines) {
+            QString out;
+            for (int i = 0; i < line.size(); ++i) {
+                const QChar ch = line.at(i);
+                if (ch == u'"' && (i == 0 || line.at(i - 1) != u'\\'))
+                    inString = !inString;
+                if (!inString && ch == u'/' && i + 1 < line.size() && line.at(i + 1) == u'/')
+                    break;
+                out.append(ch);
+            }
+            stripped.append(out);
+        }
+        bytes = stripped.join(u'\n').toUtf8();
+    }
 
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(bytes, &error);
