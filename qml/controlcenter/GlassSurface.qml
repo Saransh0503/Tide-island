@@ -7,88 +7,82 @@ Item {
     property real radius: 20
     property bool hovered: false
     property bool pressed: false
+    readonly property real innerRadius: Math.max(0, radius - 1)
 
     Rectangle {
         anchors.fill: parent
         radius: root.radius
+        color: root.hovered ? "#55575c" : "#47494d"
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: root.innerRadius
         gradient: Gradient {
             GradientStop {
                 position: 0.0
-                color: root.pressed ? "#303238" : (root.hovered ? "#2d3035" : "#282b30")
+                color: root.pressed ? "#202226" : (root.hovered ? "#303236" : "#292b2f")
             }
             GradientStop {
-                position: 0.48
-                color: root.pressed ? "#202328" : (root.hovered ? "#22262a" : "#1f2226")
+                position: 0.58
+                color: root.pressed ? "#191b1f" : (root.hovered ? "#26282c" : "#222428")
             }
             GradientStop {
                 position: 1.0
-                color: root.pressed ? "#151719" : "#121416"
+                color: root.pressed ? "#14161a" : "#1d1f23"
             }
         }
     }
 
     Rectangle {
         anchors.fill: parent
-        radius: root.radius
+        anchors.margins: 1
+        radius: root.innerRadius
+        gradient: Gradient {
+            GradientStop {
+                position: 0.0
+                color: root.hovered ? "#12ffffff" : "#0dffffff"
+            }
+            GradientStop {
+                position: 0.06
+                color: root.hovered ? "#07ffffff" : "#05ffffff"
+            }
+            GradientStop {
+                position: 0.13
+                color: StyleTokens.clearBlack
+            }
+            GradientStop {
+                position: 1.0
+                color: StyleTokens.clearBlack
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: root.innerRadius
         color: StyleTokens.transparent
         border.width: 1
-        border.color: root.hovered ? "#26ffffff" : "#18ffffff"
+        border.color: root.hovered ? "#18ffffff" : "#10ffffff"
     }
 
     Rectangle {
-        anchors.fill: parent
-        radius: root.radius
-        gradient: Gradient {
-            GradientStop {
-                position: 0.0
-                color: "#0dffffff"
-            }
-            GradientStop {
-                position: 0.28
-                color: "#02ffffff"
-            }
-            GradientStop {
-                position: 1.0
-                color: StyleTokens.clearBlack
-            }
-        }
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: root.radius
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop {
-                position: 0.0
-                color: "#03ffffff"
-            }
-            GradientStop {
-                position: 0.42
-                color: "#01ffffff"
-            }
-            GradientStop {
-                position: 1.0
-                color: StyleTokens.clearBlack
-            }
-        }
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: root.radius
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 1
+        height: Math.min(8, parent.height * 0.16)
+        radius: root.innerRadius
         gradient: Gradient {
             GradientStop {
                 position: 0.0
                 color: StyleTokens.clearBlack
             }
             GradientStop {
-                position: 0.68
-                color: StyleTokens.clearBlack
-            }
-            GradientStop {
                 position: 1.0
-                color: "#14000000"
+                color: "#16000000"
             }
         }
     }

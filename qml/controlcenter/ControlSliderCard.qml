@@ -58,16 +58,10 @@ Rectangle {
             anchors.bottom: parent.bottom
             height: 22
             radius: 11
-            color: StyleTokens.clearBlack
+            color: "#26272b"
+            border.width: 1
+            border.color: "#34363a"
             clip: true
-
-            GlassSurface {
-                anchors.fill: parent
-                radius: sliderTrack.radius
-                hovered: sliderArea.containsMouse
-                pressed: sliderArea.pressed
-                opacity: 0.24
-            }
 
             Rectangle {
                 anchors.left: parent.left
@@ -97,11 +91,11 @@ Rectangle {
                     orientation: Gradient.Horizontal
                     GradientStop {
                         position: 0.0
-                        color: "#f7f8fb"
+                        color: "#f4f5f7"
                     }
                     GradientStop {
                         position: 1.0
-                        color: "#d9dbe0"
+                        color: "#d8d9dd"
                     }
                 }
             }
@@ -113,15 +107,15 @@ Rectangle {
                 height: root.knobSize
                 radius: root.knobSize / 2
                 border.width: 1
-                border.color: "#88ffffff"
+                border.color: "#66ffffff"
                 gradient: Gradient {
                     GradientStop {
                         position: 0.0
-                        color: "#ffffff"
+                        color: "#f6f7f9"
                     }
                     GradientStop {
                         position: 1.0
-                        color: "#d9dbe0"
+                        color: "#dedfe3"
                     }
                 }
             }
