@@ -4,7 +4,7 @@ import Quickshell.Io
 import Quickshell.Widgets
 import IslandBackend
 
-Item {
+FocusScope {
     id: root
 
     signal closeRequested
@@ -97,7 +97,8 @@ Item {
     readonly property var transitionTypes: ["center", "simple", "left", "right", "top", "bottom", "any", "random"]
     property int selectedTransitionIndex: 0
 
-    focus: true
+    focus: showCondition
+    activeFocusOnTab: true
     anchors.fill: parent
     opacity: showCondition ? 1 : 0
 
@@ -114,7 +115,7 @@ Item {
                 startScan();
             else
                 syncCurrentIndex();
-            root.forceActiveFocus();
+            root.grabKeyboardFocus();
             focusTimer.restart();
         } else {
             releaseResources();
@@ -258,11 +259,24 @@ Item {
         }
     }
 
+    function grabKeyboardFocus() {
+        root.focus = true;
+        root.forceActiveFocus();
+    }
+
+    function moveNext() {
+        pathView.incrementCurrentIndex();
+    }
+
+    function movePrevious() {
+        pathView.decrementCurrentIndex();
+    }
+
     Timer {
         id: focusTimer
         interval: 80
         repeat: false
-        onTriggered: root.forceActiveFocus()
+        onTriggered: root.grabKeyboardFocus()
     }
 
     Keys.onPressed: event => {
@@ -272,13 +286,15 @@ Item {
             event.accepted = true;
             break;
         case Qt.Key_Right:
+        case Qt.Key_L:
         case Qt.Key_Tab:
-            pathView.incrementCurrentIndex();
+            root.moveNext();
             event.accepted = true;
             break;
         case Qt.Key_Left:
+        case Qt.Key_H:
         case Qt.Key_Backtab:
-            pathView.decrementCurrentIndex();
+            root.movePrevious();
             event.accepted = true;
             break;
         case Qt.Key_Return:

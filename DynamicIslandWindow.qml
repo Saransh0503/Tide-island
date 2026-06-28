@@ -338,6 +338,42 @@ PanelWindow {
     }
 
     Timer {
+        id: wallpaperPickerFocusTimer
+        interval: 0
+        repeat: false
+        onTriggered: root.focusWallpaperPicker()
+    }
+
+    Timer {
+        id: wallpaperPickerFocusRetryTimer
+        property int remainingAttempts: 0
+        interval: 60
+        repeat: true
+        onTriggered: {
+            root.focusWallpaperPicker();
+            remainingAttempts -= 1;
+            if (remainingAttempts <= 0 || (wallpaperPickerLoader.item && wallpaperPickerLoader.item.activeFocus))
+                stop();
+        }
+    }
+
+    HyprlandFocusGrab {
+        id: wallpaperPickerFocusGrab
+        active: islandContainer.wallpaperPickerLayerVisible
+        windows: [root]
+        onCleared: {
+            if (islandContainer.wallpaperPickerLayerVisible)
+                islandContainer.smartRestoreState();
+        }
+    }
+
+    function focusWallpaperPicker() {
+        islandContainer.forceActiveFocus();
+        if (wallpaperPickerLoader.item && wallpaperPickerLoader.item.grabKeyboardFocus)
+            wallpaperPickerLoader.item.grabKeyboardFocus();
+    }
+
+    Timer {
         id: overviewRevealTimer
         interval: 0
         repeat: false
@@ -472,6 +508,16 @@ PanelWindow {
         readonly property bool notificationLayerVisible: !root.overviewVisible && islandState === "notification"
         readonly property bool controlCenterLayerVisible: !root.overviewVisible && islandState === "control_center"
         readonly property bool wallpaperPickerLayerVisible: !root.overviewVisible && islandState === "wallpaper_picker"
+        onWallpaperPickerLayerVisibleChanged: {
+            if (wallpaperPickerLayerVisible) {
+                wallpaperPickerFocusTimer.restart();
+                wallpaperPickerFocusRetryTimer.remainingAttempts = 8;
+                wallpaperPickerFocusRetryTimer.restart();
+            } else {
+                wallpaperPickerFocusTimer.stop();
+                wallpaperPickerFocusRetryTimer.stop();
+            }
+        }
         readonly property var activePlayer: mediaController.activePlayer
         readonly property string lyricsDisplayText: mediaController.displayText
         readonly property string currentTrack: mediaController.currentTrack
@@ -1724,6 +1770,7 @@ PanelWindow {
                 active: islandContainer.wallpaperPickerLayerVisible
                 asynchronous: false
                 visible: islandContainer.wallpaperPickerLayerVisible
+                onLoaded: root.focusWallpaperPicker()
 
                 sourceComponent: Component {
                     WallpaperPickerLayer {
