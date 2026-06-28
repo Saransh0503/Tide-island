@@ -17,6 +17,7 @@ depends=(
     'wireplumber'
     'libpulse'
     'brightnessctl'
+    'hyprsunset'
     'upower'
     'bluez'
     'bluez-utils'
@@ -29,6 +30,7 @@ optdepends=(
     'imagemagick: for wallpaper thumbnails'
     'networkmanager: for wifi control'
     'iwd: for wifi control'
+    'swaync: for the Focus do-not-disturb toggle'
 )
 conflicts=('tide-island-git')
 install='tide-island.install'

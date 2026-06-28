@@ -1,11 +1,16 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell.Bluetooth
+import Quickshell.Io
 import IslandBackend
 
 Item {
     id: controlCenter
 
     signal connectivityPanelRequested(string kind, bool open)
+    signal focusModeChanged(bool enabled)
+    signal nightLightModeChanged(bool enabled)
+    signal requestNotification(string appName, string summary, string body)
 
     readonly property var userConfig: UserConfig
 
@@ -69,6 +74,11 @@ Item {
     property string batteryModeError: ""
     property string batteryModeLastCommandOutput: ""
     property int batteryModeRefreshPollsRemaining: 0
+    property bool nightLightEnabled: false
+    property bool nightLightBusy: false
+    property int nightLightTemperature: 4500
+    property bool focusEnabled: false
+    property bool focusBusy: false
 
     property string wifiLocalInfoMessage: ""
     property string wifiLocalError: ""
@@ -102,10 +112,13 @@ Item {
     readonly property string chargingIconGlyph: "\uf0e7"
     readonly property string brightnessIconGlyph: "\u{F00DF}"
     readonly property string volumeIconGlyph: "\u{F057E}"
+    readonly property string nightLightGlyph: "\uf186"
     readonly property var batteryModeGlyphs: ["", "", ""]
     readonly property real batteryDrawerHandleHeight: 20
     readonly property real batteryDrawerContentGap: 8
     readonly property real batteryModeCardHeight: 80
+    readonly property real roundToggleButtonSize: 58
+    readonly property real roundToggleButtonGap: 18
     readonly property real controlCenterExtraHeight: 12 + batteryDrawerHandleHeight
         + batteryDrawerProgress * (batteryDrawerContentGap + batteryModeCardHeight)
     readonly property real controlCenterMaximumExtraHeight: 12 + batteryDrawerHandleHeight
@@ -360,6 +373,29 @@ Item {
         batteryModeInfoMessage = batteryModeLabel(batteryModeAppliedIndex) + " active.";
         setBatteryModeVisualIndex(batteryModeAppliedIndex, true);
         refreshBatteryModeState();
+    }
+
+    function toggleNightLight() {
+        if (nightLightBusy)
+            return;
+
+        nightLightBusy = true;
+        if (nightLightEnabled) {
+            nightLightDisableProcess.running = true;
+        } else {
+            nightLightEnableProcess.running = true;
+        }
+    }
+
+    function toggleFocus() {
+        if (focusBusy)
+            return;
+
+        focusBusy = true;
+        if (focusEnabled)
+            focusDisableProcess.running = true;
+        else
+            focusEnableProcess.running = true;
     }
 
     function clearWifiPrompt() {
@@ -838,6 +874,7 @@ Item {
         SystemServices.requestBrightness();
         SystemServices.requestVolume();
         refreshBatteryModeState();
+        focusStateProcess.running = true;
     }
 
     Behavior on opacity {
@@ -872,6 +909,104 @@ Item {
             id: batteryDrawerProgressAnimation
             duration: 240
             easing.type: Easing.OutCubic
+        }
+    }
+
+    Process {
+        id: focusStateProcess
+        command: ["swaync-client", "--get-dnd"]
+        running: false
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                const enabled = line.trim().toLowerCase() === "true";
+                controlCenter.focusEnabled = enabled;
+                controlCenter.focusModeChanged(enabled);
+            }
+        }
+    }
+
+    Process {
+        id: nightLightEnableProcess
+        command: [
+            "sh",
+            "-c",
+            "temp=\"$1\"\n"
+                + "if ! command -v hyprsunset >/dev/null 2>&1; then exit 127; fi\n"
+                + "if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
+                + "if ! command -v pgrep >/dev/null 2>&1 || ! pgrep -x hyprsunset >/dev/null 2>&1; then\n"
+                + "  if command -v setsid >/dev/null 2>&1; then\n"
+                + "    setsid hyprsunset >/dev/null 2>&1 < /dev/null &\n"
+                + "  else\n"
+                + "    nohup hyprsunset >/dev/null 2>&1 < /dev/null &\n"
+                + "  fi\n"
+                + "fi\n"
+                + "i=0\n"
+                + "while [ \"$i\" -lt 24 ]; do\n"
+                + "  if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
+                + "  i=$((i + 1))\n"
+                + "  sleep 0.04\n"
+                + "done\n"
+                + "exit 1",
+            "tide-night-light",
+            controlCenter.nightLightTemperature.toString()
+        ]
+        running: false
+
+        onExited: function(exitCode) {
+            if (exitCode === 0) {
+                controlCenter.nightLightBusy = false;
+                controlCenter.nightLightEnabled = true;
+                controlCenter.nightLightModeChanged(true);
+                controlCenter.requestNotification("Night Light", "Night Light enabled", controlCenter.nightLightTemperature + "K");
+                return;
+            }
+
+            controlCenter.nightLightBusy = false;
+            controlCenter.nightLightEnabled = false;
+            controlCenter.nightLightModeChanged(false);
+            controlCenter.requestNotification("Night Light", "Night Light unavailable", "Install hyprsunset to use Night Light.");
+        }
+    }
+
+    Process {
+        id: nightLightDisableProcess
+        command: ["sh", "-c", "hyprctl hyprsunset identity >/dev/null 2>&1 || true"]
+        running: false
+
+        onExited: function(exitCode) {
+            controlCenter.nightLightBusy = false;
+            controlCenter.nightLightEnabled = false;
+            controlCenter.nightLightModeChanged(false);
+            controlCenter.requestNotification("Night Light", "Night Light disabled", "");
+        }
+    }
+
+    Process {
+        id: focusEnableProcess
+        command: ["swaync-client", "-dn"]
+        running: false
+
+        onExited: function(exitCode) {
+            controlCenter.focusBusy = false;
+            controlCenter.focusEnabled = exitCode === 0;
+            controlCenter.focusModeChanged(controlCenter.focusEnabled);
+            if (exitCode === 0)
+                controlCenter.requestNotification("Focus", "Focus enabled", "Notifications paused");
+        }
+    }
+
+    Process {
+        id: focusDisableProcess
+        command: ["swaync-client", "-df"]
+        running: false
+
+        onExited: function(exitCode) {
+            controlCenter.focusBusy = false;
+            controlCenter.focusEnabled = false;
+            controlCenter.focusModeChanged(false);
+            if (exitCode === 0)
+                controlCenter.requestNotification("Focus", "Focus disabled", "");
         }
     }
 
@@ -1599,6 +1734,147 @@ Item {
                             controlCenter.batteryModeDragOffset = 0;
                             controlCenter.setBatteryModeVisualIndex(controlCenter.batteryModeAppliedIndex, true);
                         }
+                    }
+                }
+            }
+
+            Item {
+                id: roundToggleGroup
+                readonly property real contentWidth: controlCenter.roundToggleButtonSize * 2
+                    + controlCenter.roundToggleButtonGap
+
+                x: batteryDrawer.cardWidth + connectivityCardsRow.spacing
+                    + (batteryDrawer.cardWidth - contentWidth) / 2
+                y: batteryModeCard.y + (batteryModeCard.height - height) / 2
+                width: contentWidth
+                height: controlCenter.roundToggleButtonSize
+                opacity: Math.min(1, controlCenter.batteryDrawerProgress * 1.35)
+
+                Rectangle {
+                    id: focusButton
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: controlCenter.roundToggleButtonSize
+                    height: controlCenter.roundToggleButtonSize
+                    radius: width / 2
+                    property real slashProgress: controlCenter.focusEnabled ? 1 : 0
+                    property color iconColor: controlCenter.focusEnabled ? StyleTokens.white : StyleTokens.textDisabled
+                    color: controlCenter.focusEnabled
+                        ? StyleTokens.accent
+                        : (focusButtonMouse.containsMouse ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard)
+                    clip: true
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: StyleTokens.durationFast
+                        }
+                    }
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 120
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    Behavior on slashProgress {
+                        NumberAnimation {
+                            duration: 830
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    scale: focusButtonMouse.pressed ? 0.94 : 1.0
+
+                    MouseArea {
+                        id: focusButtonMouse
+                        anchors.fill: parent
+                        enabled: !controlCenter.focusBusy
+                        hoverEnabled: true
+                        onClicked: controlCenter.toggleFocus()
+                    }
+
+                    Shape {
+                        anchors.centerIn: parent
+                        width: 26
+                        height: 26
+                        opacity: controlCenter.focusBusy ? 0.5 : 1.0
+                        preferredRendererType: Shape.CurveRenderer
+
+                        ShapePath {
+                            fillColor: StyleTokens.transparent
+                            strokeColor: focusButton.iconColor
+                            strokeWidth: 2
+                            capStyle: ShapePath.RoundCap
+                            joinStyle: ShapePath.RoundJoin
+
+                            PathSvg {
+                                path: "M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"
+                            }
+                        }
+
+                        ShapePath {
+                            fillColor: StyleTokens.transparent
+                            strokeColor: focusButton.iconColor
+                            strokeWidth: 2.1
+                            capStyle: ShapePath.RoundCap
+                            joinStyle: ShapePath.RoundJoin
+
+                            PathMove {
+                                x: 1
+                                y: 1
+                            }
+
+                            PathLine {
+                                x: 1 + 22 * focusButton.slashProgress
+                                y: 1 + 22 * focusButton.slashProgress
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: nightLightButton
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: controlCenter.roundToggleButtonSize
+                    height: controlCenter.roundToggleButtonSize
+                    radius: width / 2
+                    color: controlCenter.nightLightEnabled
+                        ? StyleTokens.warning
+                        : (nightLightButtonMouse.containsMouse ? StyleTokens.connectivityCardHover : StyleTokens.connectivityCard)
+                    clip: true
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: StyleTokens.durationFast
+                        }
+                    }
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 120
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    scale: nightLightButtonMouse.pressed ? 0.94 : 1.0
+
+                    MouseArea {
+                        id: nightLightButtonMouse
+                        anchors.fill: parent
+                        enabled: !controlCenter.nightLightBusy
+                        hoverEnabled: true
+                        onClicked: controlCenter.toggleNightLight()
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: controlCenter.nightLightGlyph
+                        color: controlCenter.nightLightEnabled ? StyleTokens.white : StyleTokens.textDisabled
+                        font.pixelSize: 25
+                        font.family: iconFontFamily
+                        opacity: controlCenter.nightLightBusy ? 0.5 : 1.0
                     }
                 }
             }

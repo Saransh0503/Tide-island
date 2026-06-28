@@ -32,6 +32,7 @@ PanelWindow {
     readonly property bool connectivityPromptActive: controlCenterLoader.item
         ? controlCenterLoader.item.hasConnectivityPrompt
         : false
+    readonly property var controlCenterRef: controlCenterLoader.item
     readonly property int currentMonitorWorkspaceId: hyprMonitor && hyprMonitor.activeWorkspace
         ? hyprMonitor.activeWorkspace.id
         : 1
@@ -1756,7 +1757,21 @@ PanelWindow {
                         currentWorkspace: islandContainer.currentWs
                         currentTrack: islandContainer.currentTrack
                         currentArtist: islandContainer.currentArtist
+                        nightLightEnabled: root.shellRootController && root.shellRootController.nightLightEnabled !== undefined
+                            ? root.shellRootController.nightLightEnabled
+                            : false
                         showCondition: islandContainer.controlCenterLayerVisible
+                        onFocusModeChanged: function(enabled) {
+                            if (root.shellRootController && root.shellRootController.focusEnabled !== undefined)
+                                root.shellRootController.focusEnabled = enabled;
+                        }
+                        onNightLightModeChanged: function(enabled) {
+                            if (root.shellRootController && root.shellRootController.nightLightEnabled !== undefined)
+                                root.shellRootController.nightLightEnabled = enabled;
+                        }
+                        onRequestNotification: function(appName, summary, body) {
+                            islandContainer.showNotificationCapsule(appName, summary, body);
+                        }
                         onConnectivityPanelRequested: function(kind, open) {
                             root.setConnectivityDetailVisible(kind, open);
                         }
