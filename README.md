@@ -55,45 +55,30 @@ It's built with Quickshell, QML, and C++/Qt 6. Most of the effort went into maki
 <table>
   <tr>
     <td width="50%">
-      <h3 align="center">Clock Mode</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/clock.png" width="100%" alt="Clock mode preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/mp.png" width="100%" alt="Music player" />
     </td>
     <td width="50%">
-      <h3 align="center">System Notifications</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/msg.png" width="100%" alt="System notification preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/msg.png" width="100%" alt="Message preview" />
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h3 align="center">Control Center</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/cc_1.png" width="100%" alt="Control center preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/timer.png" width="100%" alt="Timer" />
     </td>
     <td width="50%">
-      <h3 align="center">Music Player</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/player.png" width="100%" alt="Music player preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/wallpaper%20switcher.png" width="100%" alt="Wallpaper switcher" />
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h3 align="center">Bluetooth Connection Status</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/onBTConnected.png" width="100%" alt="Bluetooth connection status preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/cc_2.png" width="100%" alt="Control center" />
     </td>
     <td width="50%">
-      <h3 align="center">Workspace Overview</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/overview.png" width="100%" alt="Workspace overview preview">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <h3 align="center">Lyrics</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/lyrics.png" width="100%" alt="Lyrics preview">
-    </td>
-    <td width="50%">
-      <h3 align="center">Custom Page</h3>
-      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/custom.png" width="100%" alt="Custom page preview">
+      <img src="https://raw.githubusercontent.com/enhaoswen/Tide-island/display/Preview/Workspace overview_2.png" width="100%" alt="Workspace overview" />
     </td>
   </tr>
 </table>
+
 
 <br>
 
