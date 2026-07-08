@@ -11,6 +11,9 @@ Rectangle {
         "none", "simple", "fade", "left", "right", "top", "bottom",
         "wipe", "wave", "grow", "center", "any", "outer", "random"
     ]
+    property int revision: 0
+    readonly property bool customCommandActive: revision >= 0 && boolValue("wallpaperCustomCommandEnabled", false)
+    readonly property string customCommandSavedText: revision >= 0 ? textValue("wallpaperCustomCommand", "") : ""
 
     color: "transparent"
     radius: 10
@@ -55,11 +58,13 @@ Rectangle {
     function saveText(key, value) {
         ConfigStore.setValue(key, String(value))
         ConfigStore.save()
+        revision += 1
     }
 
     function saveBool(key, value) {
         ConfigStore.setValue(key, !!value)
         ConfigStore.save()
+        revision += 1
     }
 
     Column {
@@ -79,6 +84,7 @@ Rectangle {
             keyName: "wallpaperPath"
             fallbackText: ""
             directoryMode: false
+            blocked: root.customCommandActive
             width: parent.width
         }
 
@@ -90,6 +96,7 @@ Rectangle {
             keyName: "wallpaperLibraryPath"
             fallbackText: ""
             directoryMode: true
+            blocked: root.customCommandActive
             width: parent.width
         }
 
@@ -100,6 +107,7 @@ Rectangle {
             description: "Run wal -i after awww applies a wallpaper"
             keyName: "wallpaperPywalEnabled"
             fallbackValue: false
+            blocked: root.customCommandActive
             width: parent.width
         }
 
@@ -108,6 +116,12 @@ Rectangle {
         Item {
             width: parent.width
             height: transitionColumn.implicitHeight
+            enabled: !root.customCommandActive
+            opacity: root.customCommandActive ? 0.46 : 1
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.animationDuration }
+            }
 
             Column {
                 id: transitionColumn
@@ -119,6 +133,25 @@ Rectangle {
                     width: parent.width
                 }
             }
+        }
+
+        SplitLine { width: parent.width }
+
+        ToggleRow {
+            title: "Enable Custom Command"
+            description: "Use a bash script instead of the built-in wallpaper apply flow"
+            keyName: "wallpaperCustomCommandEnabled"
+            fallbackValue: false
+            width: parent.width
+        }
+
+        SplitLine { width: parent.width }
+
+        ScriptRow {
+            title: "Custom Command"
+            description: "Bash script; selected wallpaper path is passed as $1"
+            width: parent.width
+            blocked: !root.customCommandActive
         }
     }
 
@@ -161,8 +194,15 @@ Rectangle {
         property string keyName: ""
         property string fallbackText: ""
         property bool directoryMode: false
+        property bool blocked: false
 
+        enabled: !blocked
+        opacity: blocked ? 0.46 : 1
         height: 49
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.animationDuration }
+        }
 
         Text {
             id: rowTitle
@@ -235,8 +275,15 @@ Rectangle {
         property string description: ""
         property string keyName: ""
         property bool fallbackValue: false
+        property bool blocked: false
 
+        enabled: !blocked
+        opacity: blocked ? 0.46 : 1
         height: 49
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.animationDuration }
+        }
 
         Text {
             id: rowTitle
@@ -267,6 +314,129 @@ Rectangle {
         }
     }
 
+    component ScriptRow: Item {
+        id: row
+
+        property string title: ""
+        property string description: ""
+        property bool blocked: false
+        property bool loaded: false
+
+        enabled: !blocked
+        opacity: blocked ? 0.46 : 1
+        height: 176
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.animationDuration }
+        }
+
+        Text {
+            id: rowTitle
+            text: row.title
+            font.family: Theme.textFontFamily
+            font.pixelSize: 18
+            color: Theme.textColor
+            anchors.left: parent.left
+            anchors.top: parent.top
+        }
+
+        Text {
+            text: row.description
+            font.family: Theme.textFontFamily
+            font.pixelSize: 14
+            color: Theme.subtleTextColor
+            wrapMode: Text.Wrap
+            anchors.left: rowTitle.left
+            anchors.top: rowTitle.bottom
+            anchors.topMargin: 5
+            width: Math.max(120, editorBox.x - 24)
+        }
+
+        Rectangle {
+            id: editorBox
+
+            anchors.right: parent.right
+            anchors.top: parent.top
+            width: Math.max(300, Math.min(500, parent.width * 0.58))
+            height: 132
+            radius: 8
+            color: row.enabled ? Theme.inputBgColor : "#d6d0c8"
+            border.width: 2
+            border.color: commandField.activeFocus ? Theme.focusBorderColor : (row.enabled ? Theme.inputBorderColor : "#c7beb5")
+
+            Behavior on color {
+                ColorAnimation { duration: Theme.animationDuration }
+            }
+
+            Behavior on border.color {
+                ColorAnimation { duration: Theme.animationDuration }
+            }
+
+            Flickable {
+                id: commandScroller
+
+                anchors.fill: parent
+                anchors.margins: 2
+                clip: true
+                contentWidth: width
+                contentHeight: commandField.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                TextArea.flickable: TextArea {
+                    id: commandField
+
+                    enabled: row.enabled
+                    width: commandScroller.width
+                    background: null
+                    color: row.enabled ? Theme.textColor : Theme.subtleTextColor
+                    placeholderText: "bash script"
+                    placeholderTextColor: Theme.subtleTextColor
+                    selectionColor: Theme.selectedColor
+                    selectedTextColor: Theme.buttonTextColor
+                    wrapMode: TextEdit.Wrap
+                    leftPadding: 8
+                    rightPadding: 8
+                    topPadding: 6
+                    bottomPadding: 6
+                    font.family: Theme.textFontFamily
+                    font.pixelSize: 13
+
+                    Component.onCompleted: {
+                        text = root.customCommandSavedText
+                        row.loaded = true
+                    }
+
+                    onActiveFocusChanged: {
+                        if (!activeFocus && row.loaded)
+                            row.commit()
+                    }
+
+                    Keys.onPressed: function(event) {
+                        if ((event.modifiers & Qt.ControlModifier)
+                            && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                            row.commit()
+                            event.accepted = true
+                        }
+                    }
+                }
+            }
+        }
+
+        ButtonLike {
+            anchors.right: parent.right
+            anchors.top: editorBox.bottom
+            anchors.topMargin: 8
+            text: "Save"
+            enabled: row.enabled
+
+            onClicked: row.commit()
+        }
+
+        function commit() {
+            root.saveText("wallpaperCustomCommand", commandField.text)
+        }
+    }
+
     component ButtonLike: Rectangle {
         id: button
 
@@ -277,12 +447,12 @@ Rectangle {
         width: 78
         height: 36
         radius: 8
-        color: mouseArea.pressed ? Theme.buttonHoverColor : mouseArea.containsMouse ? Theme.buttonHoverColor : Theme.buttonColor
+        color: !button.enabled ? "#d6d0c8" : mouseArea.pressed ? Theme.buttonHoverColor : mouseArea.containsMouse ? Theme.buttonHoverColor : Theme.buttonColor
 
         Text {
             anchors.centerIn: parent
             text: button.text
-            color: Theme.buttonTextColor
+            color: button.enabled ? Theme.buttonTextColor : Theme.subtleTextColor
             font.family: Theme.textFontFamily
             font.pixelSize: 13
             font.weight: Font.DemiBold
@@ -291,8 +461,9 @@ Rectangle {
         MouseArea {
             id: mouseArea
             anchors.fill: parent
+            enabled: button.enabled
             hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+            cursorShape: button.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
             onClicked: button.clicked()
         }
     }

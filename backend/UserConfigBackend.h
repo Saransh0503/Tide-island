@@ -19,6 +19,8 @@ class UserConfigBackend final : public QObject {
     Q_PROPERTY(QString wallpaperPath READ wallpaperPath NOTIFY wallpaperPathChanged FINAL)
     Q_PROPERTY(QString wallpaperLibraryPath READ wallpaperLibraryPath NOTIFY wallpaperLibraryPathChanged FINAL)
     Q_PROPERTY(bool wallpaperPywalEnabled READ wallpaperPywalEnabled NOTIFY wallpaperPywalEnabledChanged FINAL)
+    Q_PROPERTY(bool wallpaperCustomCommandEnabled READ wallpaperCustomCommandEnabled NOTIFY wallpaperCustomCommandEnabledChanged FINAL)
+    Q_PROPERTY(QString wallpaperCustomCommand READ wallpaperCustomCommand NOTIFY wallpaperCustomCommandChanged FINAL)
     Q_PROPERTY(QString wallpaperTransitionType READ wallpaperTransitionType NOTIFY wallpaperTransitionTypeChanged FINAL)
     Q_PROPERTY(int wallpaperTransitionStep READ wallpaperTransitionStep NOTIFY wallpaperTransitionStepChanged FINAL)
     Q_PROPERTY(double wallpaperTransitionDuration READ wallpaperTransitionDuration NOTIFY wallpaperTransitionDurationChanged FINAL)
@@ -64,6 +66,8 @@ public:
     QString wallpaperPath() const;
     QString wallpaperLibraryPath() const;
     bool wallpaperPywalEnabled() const;
+    bool wallpaperCustomCommandEnabled() const;
+    QString wallpaperCustomCommand() const;
     QString wallpaperTransitionType() const;
     int wallpaperTransitionStep() const;
     double wallpaperTransitionDuration() const;
@@ -109,6 +113,8 @@ signals:
     void wallpaperPathChanged();
     void wallpaperLibraryPathChanged();
     void wallpaperPywalEnabledChanged();
+    void wallpaperCustomCommandEnabledChanged();
+    void wallpaperCustomCommandChanged();
     void wallpaperTransitionTypeChanged();
     void wallpaperTransitionStepChanged();
     void wallpaperTransitionDurationChanged();
@@ -154,6 +160,8 @@ private:
     QString m_wallpaperPath;
     QString m_wallpaperLibraryPath;
     bool m_wallpaperPywalEnabled = false;
+    bool m_wallpaperCustomCommandEnabled = false;
+    QString m_wallpaperCustomCommand;
     QString m_wallpaperTransitionType = QStringLiteral("center");
     int m_wallpaperTransitionStep = 5;
     double m_wallpaperTransitionDuration = 3.0;

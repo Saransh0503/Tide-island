@@ -41,6 +41,8 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
         "wallpaperPath": "/tmp/test-wallpaper.jpg",
         "wallpaperLibraryPath": "/tmp/wallpapers",
         "wallpaperPywalEnabled": true,
+        "wallpaperCustomCommandEnabled": true,
+        "wallpaperCustomCommand": "swww img \"$1\"",
         "wallpaperTransitionType": "wave",
         "wallpaperTransitionStep": 12,
         "wallpaperTransitionDuration": 4.5,
@@ -64,6 +66,8 @@ void UserConfigBackendTests::loadsTypedValuesFromJson()
     QCOMPARE(config.wallpaperPath(), QStringLiteral("/tmp/test-wallpaper.jpg"));
     QCOMPARE(config.wallpaperLibraryPath(), QStringLiteral("/tmp/wallpapers"));
     QCOMPARE(config.wallpaperPywalEnabled(), true);
+    QCOMPARE(config.wallpaperCustomCommandEnabled(), true);
+    QCOMPARE(config.wallpaperCustomCommand(), QStringLiteral("swww img \"$1\""));
     QCOMPARE(config.wallpaperTransitionType(), QStringLiteral("wave"));
     QCOMPARE(config.wallpaperTransitionStep(), 12);
     QCOMPARE(config.wallpaperTransitionDuration(), 4.5);
@@ -93,6 +97,8 @@ void UserConfigBackendTests::exposesParseErrorsAndFallsBackToDefaults()
     QCOMPARE(config.textFontFamily(), QStringLiteral("Inter Display"));
     QCOMPARE(config.tlpPermissionMode(), QStringLiteral("skip"));
     QCOMPARE(config.wallpaperPywalEnabled(), false);
+    QCOMPARE(config.wallpaperCustomCommandEnabled(), false);
+    QCOMPARE(config.wallpaperCustomCommand(), QString());
     QCOMPARE(config.wallpaperTransitionType(), QStringLiteral("center"));
     QCOMPARE(config.wallpaperTransitionStep(), 5);
     QCOMPARE(config.wallpaperTransitionDuration(), 3.0);

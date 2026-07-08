@@ -622,7 +622,9 @@ PanelWindow {
         id: overviewWallpaperCache
 
         active: root.overviewLoaderActive
-        wallpaperPath: userConfig.wallpaperPath
+        wallpaperPath: userConfig.wallpaperCustomCommandEnabled === true && root.wallpaperPickerActiveWallpaper !== ""
+            ? root.wallpaperPickerActiveWallpaper
+            : userConfig.wallpaperPath
         hyprMonitor: root.hyprMonitor
         screenObject: root.screen
     }
@@ -2188,7 +2190,7 @@ PanelWindow {
                         textFontFamily: root.textFontFamily
                         activeWallpaper: root.wallpaperPickerActiveWallpaper
                         showCondition: islandContainer.wallpaperPickerLayerVisible
-                        onWallpaperApplied: () => root.wallpaperPickerActiveWallpaper = userConfig.wallpaperPath
+                        onWallpaperApplied: filePath => root.wallpaperPickerActiveWallpaper = filePath
                         onCloseRequested: islandContainer.smartRestoreState()
                     }
                 }

@@ -16,6 +16,8 @@ FocusScope {
     readonly property var userConfig: UserConfig
 
     property bool pywalEnabled: userConfig.wallpaperPywalEnabled
+    property bool customCommandEnabled: userConfig.wallpaperCustomCommandEnabled === true
+    property string customCommand: userConfig.wallpaperCustomCommand === undefined || userConfig.wallpaperCustomCommand === null ? "" : String(userConfig.wallpaperCustomCommand)
     property int transitionFps: boundedInt(userConfig.wallpaperTransitionFps, 60, 1, 240)
     property int transitionStep: boundedInt(userConfig.wallpaperTransitionStep, 5, 1, 255)
     property real transitionDuration: boundedReal(userConfig.wallpaperTransitionDuration, 3.0, 0, 120)
@@ -163,6 +165,8 @@ FocusScope {
             scanProcess.running = false;
         if (applyProcess.running)
             applyProcess.running = false;
+        if (customApplyProcess.running)
+            customApplyProcess.running = false;
         pendingThumbnails = [];
         pendingThumbnailKeys = ({});
         thumbnailInFlight = false;
@@ -348,13 +352,24 @@ FocusScope {
 
     function applyWallpaper(filePath) {
         const targetPath = root.targetWallpaperPath;
-        if (filePath === "" || targetPath === "")
+        const commandText = root.customCommand.trim();
+        const useCustomCommand = root.customCommandEnabled;
+        if (filePath === "" || (useCustomCommand && commandText.length === 0) || (!useCustomCommand && targetPath === ""))
             return;
         latestAppliedWallpaper = filePath;
         wallpaperApplied(filePath);
         closeAfterApply = true;
         if (applyProcess.running)
             applyProcess.running = false;
+        if (customApplyProcess.running)
+            customApplyProcess.running = false;
+        if (useCustomCommand) {
+            customApplyProcess.wallpaperPath = filePath;
+            customApplyProcess.targetPath = targetPath;
+            customApplyProcess.commandText = root.customCommand;
+            customApplyProcess.running = true;
+            return;
+        }
         applyProcess.wallpaperPath = filePath;
         applyProcess.targetPath = targetPath;
         applyProcess.transitionType = configuredTransitionType;
@@ -429,6 +444,26 @@ FocusScope {
             root.transitionWave,
             root.transitionInvertY ? "true" : "false",
             root.pywalEnabled ? "true" : "false"
+        ]
+        onExited: {
+            running = false;
+            if (root.closeAfterApply) {
+                root.closeAfterApply = false;
+                root.closeRequested();
+            }
+        }
+    }
+
+    Process {
+        id: customApplyProcess
+        property string wallpaperPath: ""
+        property string targetPath: ""
+        property string commandText: ""
+        command: [
+            "bash", "-c", commandText,
+            "tide-island-wallpaper",
+            wallpaperPath,
+            targetPath
         ]
         onExited: {
             running = false;

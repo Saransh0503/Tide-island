@@ -160,33 +160,9 @@ PagePanel {
             }
 
             Text {
-                id: wallpaperTitle
-                text: "Wallpaper"
-                anchors.top: customPagePanel.bottom
-                anchors.topMargin: 34
-                anchors.left: parent.left
-                anchors.leftMargin: 32
-                anchors.right: parent.right
-                anchors.rightMargin: 40
-                font.family: Theme.titleFontFamily
-                font.pixelSize: 23
-            }
-
-            Wallpaper {
-                id: wallpaperPanel
-                anchors.top: wallpaperTitle.bottom
-                anchors.topMargin: 15
-                anchors.left: parent.left
-                anchors.leftMargin: 30
-                anchors.right: parent.right
-                anchors.rightMargin: 40
-                height: implicitHeight
-            }
-
-            Text {
                 id: tlpTitle
                 text: "TLP"
-                anchors.top: wallpaperPanel.bottom
+                anchors.top: customPagePanel.bottom
                 anchors.topMargin: 34
                 anchors.left: parent.left
                 anchors.leftMargin: 32
