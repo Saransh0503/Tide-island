@@ -21,13 +21,13 @@ in vec2 Position;
 out vec4 out_color;
 
 layout(binding = 1) uniform radius_uniform {
-    vec2 half_size; // center of circle
-    float top_anchor;
+    vec2 center;
+    vec2 half_size;
     float radius;
 };
 
 void main() {
-    vec2 local_pos = Position - vec2(half_size.x, top_anchor + half_size.y);
+    vec2 local_pos = Position - center;
     vec2 q = abs(local_pos) - half_size + radius;
     float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
     float px = fwidth(dist) * 0.5;
@@ -36,4 +36,4 @@ void main() {
 }
 @end
 
-@program island vs fs
+@program rectangle vs fs

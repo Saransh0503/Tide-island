@@ -4,7 +4,6 @@
   <b>A smooth, lightweight, and flexible interactive Dynamic Island for Hyprland.</b>
 </p>
 
-
 <p align="center">
   <a href="https://github.com/enhaoswen/Tide-island/stargazers">
     <img alt="GitHub stars" src="https://img.shields.io/github/stars/enhaoswen/Tide-island?style=flat-square&color=8aadf4">
@@ -21,17 +20,15 @@
 
 ---
 
+## About this
+
 ### What's this
 
 This is a new version of Tide Island. Which is made using OpenGL ES 3.
 
-
-
 ### Why make a new version
 
 Quickshell has high memory usage and suffers from memory leaks.
-
-
 
 <br>
 

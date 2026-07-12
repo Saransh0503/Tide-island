@@ -1,3 +1,10 @@
+// ============================================================================
+// Tide Island graphics backend selection
+// ============================================================================
+//
+// This translation unit detects software-rendered OpenGL contexts and prepares
+// fallback environment variables before the EGL context is created.
+//
 #include "environment.hpp"
 #include "log.hpp"
 
@@ -17,9 +24,15 @@
 using namespace std;
 namespace fs = filesystem;
 
+// ============================================================================
+// [Internal Details]
+// ============================================================================
+
 namespace {
 
-enum class RendererKind {
+// --- Environment Helpers ---
+
+enum RendererKind : char {
     Hardware,
     Llvmpipe,
     Softpipe,
@@ -47,12 +60,16 @@ constexpr array software_renderer_names = {
     string_view{"swrast"},
 };
 
+// --- Renderer Classification ---
+
 [[nodiscard]] RendererKind classify_renderer(string_view renderer) noexcept {
     if (renderer.contains("llvmpipe")) return RendererKind::Llvmpipe;
     if (renderer.contains("softpipe")) return RendererKind::Softpipe;
     if (renderer.contains("swrast"))   return RendererKind::OtherSoftware;
     return RendererKind::Hardware;
 }
+
+// --- Explicit User Configuration ---
 
 [[nodiscard]] bool explicit_driver_selected() noexcept {
     return env_is_set("GALLIUM_DRIVER")            ||
@@ -63,11 +80,12 @@ constexpr array software_renderer_names = {
 [[nodiscard]] bool explicit_software_requested() noexcept {
     if (env_is_true("LIBGL_ALWAYS_SOFTWARE")) return true;
 
-    // 使用 ranges 版本，完美支持直接传入 {"..."}
     return
         ranges::contains(software_renderer_names, env_value("GALLIUM_DRIVER")) ||
         ranges::contains(software_renderer_names, env_value("MESA_LOADER_DRIVER_OVERRIDE"));
 }
+
+// --- Render Node Detection ---
 
 [[nodiscard]] bool render_node_accessible() noexcept {
     error_code ec;
@@ -83,12 +101,16 @@ constexpr array software_renderer_names = {
     });
 }
 
+// --- GL Introspection ---
+
 [[nodiscard]] expected<string_view, string_view>
 query_gl_string(GLenum name) noexcept {
     const auto* p = reinterpret_cast<const char*>(::glGetString(name));
     if (!p) return unexpected{"<unavailable>"};
     return string_view{p};
 }
+
+// --- Logging Helpers ---
 
 [[nodiscard]] string join_lines(initializer_list<string_view> lines) {
     if (lines.size() == 0) return {};
@@ -122,6 +144,10 @@ void set_softpipe_for_next_context() {
 }
 
 } // namespace
+
+// ============================================================================
+// [Public API Implementation]
+// ============================================================================
 
 namespace GraphicBackend {
 

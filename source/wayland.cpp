@@ -4,9 +4,8 @@
 //
 // This translation unit owns the native Wayland, layer-shell, EGL window, and
 // swapchain-facing platform state used by the renderer.
-//
+
 #include "wayland.hpp"
-#include "renderer.hpp"
 #include "island.hpp"
 #include "log.hpp"
 
@@ -21,7 +20,6 @@
 #include <algorithm>
 #include <array>
 #include <memory>
-#include <print>
 #include <expected>
 #include <string_view>
 
@@ -36,42 +34,24 @@ namespace {
 template <auto delete_func>
 struct DeleteWayland {
     void operator()(auto* ptr) const noexcept {
-        if (ptr) {
-            delete_func(ptr);
-        }
+        if (ptr) delete_func(ptr);
     }
 };
 
-struct Context {
-    // Wayland Objects
-    unique_ptr<wl_display, DeleteWayland<wl_display_disconnect>> display{
-        nullptr
-    };
-    unique_ptr<wl_registry, DeleteWayland<wl_registry_destroy>> registry{
-        nullptr
-    };
-    unique_ptr<wl_compositor, DeleteWayland<wl_compositor_destroy>> compositor{
-        nullptr
-    };
-    unique_ptr<zwlr_layer_shell_v1, DeleteWayland<zwlr_layer_shell_v1_destroy>>
-        layer_shell{nullptr};
-    unique_ptr<wl_surface, DeleteWayland<wl_surface_destroy>> surface{
-        nullptr
-    };
-    unique_ptr<zwlr_layer_surface_v1, DeleteWayland<zwlr_layer_surface_v1_destroy>>
-        layer_surface{nullptr};
-    unique_ptr<wl_egl_window, DeleteWayland<wl_egl_window_destroy>> egl_window{
-        nullptr
-    };
+unique_ptr<wl_display, DeleteWayland<wl_display_disconnect>> display{nullptr};
+unique_ptr<wl_registry, DeleteWayland<wl_registry_destroy>> registry{nullptr};
+unique_ptr<wl_compositor, DeleteWayland<wl_compositor_destroy>> compositor{nullptr};
+unique_ptr<zwlr_layer_shell_v1, DeleteWayland<zwlr_layer_shell_v1_destroy>>
+    layer_shell{nullptr};
+unique_ptr<wl_surface, DeleteWayland<wl_surface_destroy>> surface{nullptr};
+unique_ptr<zwlr_layer_surface_v1, DeleteWayland<zwlr_layer_surface_v1_destroy>>
+    layer_surface{nullptr};
+unique_ptr<wl_egl_window, DeleteWayland<wl_egl_window_destroy>> egl_window{nullptr};
 
-    // EGL Objects
-    EGLDisplay egl_display{EGL_NO_DISPLAY};
-    EGLConfig  egl_config{nullptr};
-    EGLContext egl_context{EGL_NO_CONTEXT};
-    EGLSurface egl_surface{EGL_NO_SURFACE};
-};
-
-Context context;
+EGLDisplay egl_display{EGL_NO_DISPLAY};
+EGLConfig  egl_config{};
+EGLContext egl_context{EGL_NO_CONTEXT};
+EGLSurface egl_surface{EGL_NO_SURFACE};
 
 // --- Wayland Registry Listeners ---
 
@@ -83,19 +63,19 @@ void registry_global(
     uint32_t version
 ) {
     if (string_view(interface) == wl_compositor_interface.name) {
-        context.compositor.reset(static_cast<wl_compositor*>(
+        compositor.reset(static_cast<wl_compositor*>(
             wl_registry_bind(registry, name, &wl_compositor_interface, min(version, 4u))
         ));
     }
     else if (string_view(interface) == zwlr_layer_shell_v1_interface.name) {
-        context.layer_shell.reset(static_cast<zwlr_layer_shell_v1*>(
+        layer_shell.reset(static_cast<zwlr_layer_shell_v1*>(
             wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, min(version, 4u))
         ));
     }
 }
 
 void registry_remove(void*, wl_registry*, uint32_t id) {
-    logger(Log::Error, "[Info] Wayland global resource removed (id: {})", id);
+    logger(Log::Error, "Wayland global resource removed (id: {})", id);
 }
 
 constexpr wl_registry_listener registry_listener = {
@@ -113,12 +93,12 @@ void layer_surface_configure(
     uint32_t height
 ) {
     zwlr_layer_surface_v1_ack_configure(surface, serial);
-    logger(Log::Debug, "Configured: {} {}", width, height);
+    logger(Log::Debug, "Size: {}*{}", width, height);
     Island::set_window_size(static_cast<int>(width), static_cast<int>(height));
 }
 
 void layer_surface_closed(void*, zwlr_layer_surface_v1*) {
-    logger(Log::Error, "[Warn] Layer surface was closed by compositor. Exiting...");
+    logger(Log::Error, "Layer surface was closed by compositor. Exiting...");
     Island::set_is_running(false);
 }
 
@@ -141,87 +121,87 @@ expected<void, const char*> Wayland::init() {
     }
 
     // 1. Establish Wayland Connection & Registry
-    context.display.reset(wl_display_connect(nullptr));
-    if (!context.display) {
+    display.reset(wl_display_connect(nullptr));
+    if (!display) {
         return unexpected("Failed to connect Wayland");
     }
 
-    context.registry.reset(wl_display_get_registry(context.display.get()));
+    registry.reset(wl_display_get_registry(display.get()));
     
-    if (!context.registry.get()){
+    if (!registry.get()){
         return unexpected("Failed to get registry");
     }
 
-    wl_registry_add_listener(context.registry.get(), &registry_listener, nullptr);
-    wl_display_roundtrip(context.display.get());
+    wl_registry_add_listener(registry.get(), &registry_listener, nullptr);
+    wl_display_roundtrip(display.get());
 
-    if (wl_display_roundtrip(context.display.get()) == -1) {
+    if (wl_display_roundtrip(display.get()) == -1) {
         return unexpected("roundtrip failed");
     }
 
-    if (!context.compositor) {
+    if (!compositor) {
         return unexpected("No compositor found");
     }
 
-    if (!context.layer_shell) {
+    if (!layer_shell) {
         return unexpected("No layer shell found");
     }
 
     // 2. Setup Wayland Surface & Layer Shell
-    context.surface.reset(wl_compositor_create_surface(context.compositor.get()));
+    surface.reset(wl_compositor_create_surface(compositor.get()));
 
-    if (!context.surface.get()){
+    if (!surface.get()){
         return unexpected("Failed to sest surface");
     }
 
-    context.layer_surface.reset(zwlr_layer_shell_v1_get_layer_surface(
-        context.layer_shell.get(),
-        context.surface.get(),
+    layer_surface.reset(zwlr_layer_shell_v1_get_layer_surface(
+        layer_shell.get(),
+        surface.get(),
         nullptr,
         ZWLR_LAYER_SHELL_V1_LAYER_TOP,
         "tide-island"
     ));
 
-    if (!context.layer_surface) {
+    if (!layer_surface) {
         return unexpected("Failed to create layer surface");
     }
 
     zwlr_layer_surface_v1_set_anchor(
-        context.layer_surface.get(),
+        layer_surface.get(),
         ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP
     );
     Wayland::request_resize(island_state.window_width, island_state.window_height);
-    zwlr_layer_surface_v1_set_exclusive_zone(context.layer_surface.get(), island_state.zone);
+    zwlr_layer_surface_v1_set_exclusive_zone(layer_surface.get(), island_state.zone);
 
     zwlr_layer_surface_v1_add_listener(
-        context.layer_surface.get(),
+        layer_surface.get(),
         &layer_surface_listener,
         nullptr
     );
-    wl_surface_commit(context.surface.get());
+    wl_surface_commit(surface.get());
 
-    if (wl_display_roundtrip(context.display.get()) == -1) {
+    if (wl_display_roundtrip(display.get()) == -1) {
         return unexpected("Wayland roundtrip failed");
     }
 
     // 3. Setup EGL Window & Display
-    context.egl_window.reset(wl_egl_window_create(
-        context.surface.get(),
+    egl_window.reset(wl_egl_window_create(
+        surface.get(),
         island_state.window_width,
         island_state.window_height
     ));
-    if (!context.egl_window) {
+    if (!egl_window) {
         return unexpected("Failed to create wl_egl_window");
     }
 
-    context.egl_display = eglGetDisplay((EGLNativeDisplayType)context.display.get());
-    if (context.egl_display == EGL_NO_DISPLAY) {
+    egl_display = eglGetDisplay((EGLNativeDisplayType)display.get());
+    if (egl_display == EGL_NO_DISPLAY) {
         return unexpected("eglGetDisplay failed");
     }
 
     EGLint major{};
     EGLint minor{};
-    if (!eglInitialize(context.egl_display, &major, &minor)) {
+    if (!eglInitialize(egl_display, &major, &minor)) {
         return unexpected("eglInitialize failed");
     }
     logger(Log::Debug, "Using EGL {}.{}", major, minor);
@@ -242,7 +222,7 @@ expected<void, const char*> Wayland::init() {
     };
 
     EGLint count{};
-    if (!eglChooseConfig(context.egl_display, attribs.data(), &context.egl_config, 1, &count)
+    if (!eglChooseConfig(egl_display, attribs.data(), &egl_config, 1, &count)
         || count == 0) {
         return unexpected("eglChooseConfig failed");
     }
@@ -252,32 +232,32 @@ expected<void, const char*> Wayland::init() {
         EGL_NONE
     };
 
-    context.egl_context = eglCreateContext(
-        context.egl_display,
-        context.egl_config,
+    egl_context = eglCreateContext(
+        egl_display,
+        egl_config,
         EGL_NO_CONTEXT,
         ctx_attribs.data()
     );
-    if (context.egl_context == EGL_NO_CONTEXT) {
+    if (egl_context == EGL_NO_CONTEXT) {
         return unexpected("eglCreateContext failed");
     }
 
-    context.egl_surface = eglCreateWindowSurface(
-        context.egl_display,
-        context.egl_config,
-        (EGLNativeWindowType)context.egl_window.get(),
+    egl_surface = eglCreateWindowSurface(
+        egl_display,
+        egl_config,
+        (EGLNativeWindowType)egl_window.get(),
         nullptr
     );
 
-    if (context.egl_surface == EGL_NO_SURFACE) {
+    if (egl_surface == EGL_NO_SURFACE) {
         return unexpected("eglCreateWindowSurface failed");
     }
 
     if (!eglMakeCurrent(
-        context.egl_display,
-        context.egl_surface,
-        context.egl_surface,
-        context.egl_context
+        egl_display,
+        egl_surface,
+        egl_surface,
+        egl_context
     )) {
         return unexpected("eglMakeCurrent failed");
     }
@@ -286,47 +266,47 @@ expected<void, const char*> Wayland::init() {
 }
 
 void Wayland::dispatch_events() {
-    if (wl_display_dispatch(context.display.get()) == -1)
+    if (wl_display_dispatch(display.get()) == -1)
         logger(Log::Error, "Failed to dispatch event");
 }
 
 void Wayland::swap_buffer() {
-    eglSwapBuffers(context.egl_display, context.egl_surface);
+    eglSwapBuffers(egl_display, egl_surface);
 }
 
 void Wayland::request_resize(int width, int height) {
-    if (!context.layer_surface) {
+    if (!layer_surface) {
         logger(Log::Error, "request_resize called before layer_surface creation");
         return;
     }
-    zwlr_layer_surface_v1_set_size(context.layer_surface.get(), width, height);
+    zwlr_layer_surface_v1_set_size(layer_surface.get(), width, height);
     Island::set_window_size(width, height);
 }
 
 void Wayland::shutdown() {
-    if (!context.display) return;
+    if (!display) return;
 
     // 1. Terminate EGL Environment
-    if (context.egl_display != EGL_NO_DISPLAY) {
+    if (egl_display != EGL_NO_DISPLAY) {
         eglMakeCurrent(
-            context.egl_display,
+            egl_display,
             EGL_NO_SURFACE,
             EGL_NO_SURFACE,
             EGL_NO_CONTEXT
         );
 
-        if (context.egl_surface != EGL_NO_SURFACE) {
-            eglDestroySurface(context.egl_display, context.egl_surface);
-            context.egl_surface = EGL_NO_SURFACE;
+        if (egl_surface != EGL_NO_SURFACE) {
+            eglDestroySurface(egl_display, egl_surface);
+            egl_surface = EGL_NO_SURFACE;
         }
 
-        if (context.egl_context != EGL_NO_CONTEXT) {
-            eglDestroyContext(context.egl_display, context.egl_context);
-            context.egl_context = EGL_NO_CONTEXT;
+        if (egl_context != EGL_NO_CONTEXT) {
+            eglDestroyContext(egl_display, egl_context);
+            egl_context = EGL_NO_CONTEXT;
         }
 
-        eglTerminate(context.egl_display);
-        context.egl_display = EGL_NO_DISPLAY;
-        context.egl_config  = nullptr;
+        eglTerminate(egl_display);
+        egl_display = EGL_NO_DISPLAY;
+        egl_config  = nullptr;
     }
 }

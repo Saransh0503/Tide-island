@@ -1,11 +1,21 @@
 #pragma once
 
-#include <print>
-#include <string_view>
-#include <format>
-#include <vector>
 #include <algorithm>
-#include <ranges>
+#include <array>
+#include <format>
+#include <print>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <expected>
+
+// ============================================================================
+// Tide Island logging helpers
+// ============================================================================
+//
+// This header keeps logging lightweight: regular messages are one-line logs,
+// while frame_logger prints a bordered block for user-facing diagnostics.
+//
 
 namespace Log {
 
@@ -17,6 +27,10 @@ enum LogLevel : char {
 };
 
 } // namespace Log
+
+// ============================================================================
+// [Internal Details]
+// ============================================================================
 
 namespace {
 
@@ -34,6 +48,10 @@ inline constexpr auto YELLOW = "\033[33m";
 
 } // namespace
 
+// ============================================================================
+// [Public API Implementation]
+// ============================================================================
+
 namespace Log {
 
 inline void logger(LogLevel level, std::string_view msg) {
@@ -44,7 +62,7 @@ inline void logger(LogLevel level, std::string_view msg) {
         if constexpr (is_debug_mode) std::println("{}[DEBUG]{} {}", GRAY, RESET, msg);
     }
     else if (level == LogLevel::Warning) {
-        if (level == LogLevel::Warning) std::println(stderr, "{}[WARNING]{} {}", YELLOW, RESET, msg);
+        std::println(stderr, "{}[WARNING]{} {}", YELLOW, RESET, msg);
     }
 }
 
@@ -53,12 +71,14 @@ inline void logger(LogLevel level, std::format_string<Args...> fmt, Args&&... ar
     logger(level, std::format(fmt, std::forward<Args>(args)...));
 }
 
-template<typename... Args>
-inline void frame_logger(LogLevel level, Args&&... args ){
+template <typename... Args>
+inline void frame_logger(LogLevel level, Args&&... args) {
     if (!is_debug_mode && (level == LogLevel::Debug || level == LogLevel::Info)) return;
     if constexpr (sizeof...(Args) == 0) return;
 
-    std::array<std::string_view, sizeof...(Args)> msgs{ std::string_view{std::forward<Args>(args)}... };
+    std::array<std::string_view, sizeof...(Args)> msgs{
+        std::string_view{std::forward<Args>(args)}...
+    };
 
     size_t msg_len = 0;
     size_t total_lines = 0;
@@ -77,10 +97,10 @@ inline void frame_logger(LogLevel level, Args&&... args ){
     out_msg += "┌";
     for (size_t i = 0; i < msg_len + 2; ++i) out_msg += "─";
     out_msg += "┐\n";
-    
-    for (std::string_view s : msgs){
+
+    for (std::string_view s : msgs) {
         size_t handled_char = 0;
-        while (s.size() - handled_char > 80){
+        while (s.size() - handled_char > 80) {
             out_msg += std::format("│ {:<{}} │\n", s.substr(handled_char, 80), msg_len);
             handled_char += 80;
         }
@@ -92,6 +112,15 @@ inline void frame_logger(LogLevel level, Args&&... args ){
     out_msg += "┘\n";
 
     print("{}", out_msg);
+}
+
+template <typename return_type>
+return_type check(std::expected<return_type, const char*> result) {
+    if (!result.has_value()) {
+        logger(Log::Error, result.error());
+        std::terminate();
+    }
+    return result.value();
 }
 
 } // namespace Log
