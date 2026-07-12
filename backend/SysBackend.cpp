@@ -21,7 +21,6 @@ constexpr int kAudioEventDebounceMs = 80;
 
 SysBackend::SysBackend(QObject *parent)
     : QObject(parent),
-      m_hyprSocket(nullptr),
       m_paSubscriber(nullptr),
       m_volumeQueryProcess(nullptr),
       m_defaultSinkQueryProcess(nullptr),
@@ -44,7 +43,6 @@ SysBackend::SysBackend(QObject *parent)
       m_hasBatteryState(false),
       m_udev(nullptr),
       m_batteryMonitor(nullptr) {
-    setupHyprland();
     setupBattery();
     setupAudio();
     setupBrightness();
@@ -85,44 +83,7 @@ QString SysBackend::readSysfsTextFile(const QString &path) const {
     return value;
 }
 
-// 1. Hyprland IPC
-void SysBackend::setupHyprland() {
-    QString signature = qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE");
-    if (signature.isEmpty()) return;
-
-    QString xdgRuntime = qEnvironmentVariable("XDG_RUNTIME_DIR");
-    QString path1 = QString("%1/hypr/%2/.socket2.sock").arg(xdgRuntime, signature);
-    QString path2 = QString("/tmp/hypr/%1/.socket2.sock").arg(signature);
-
-    QString targetPath = "";
-    if (QFile::exists(path1)) targetPath = path1;
-    else if (QFile::exists(path2)) targetPath = path2;
-    else return;
-
-    m_hyprSocket = new QLocalSocket(this);
-    connect(m_hyprSocket, &QLocalSocket::readyRead, this, &SysBackend::handleHyprlandData);
-    
-    connect(m_hyprSocket, &QLocalSocket::disconnected, this, [this, targetPath]() { QTimer::singleShot(2000, m_hyprSocket, [this, targetPath](){ m_hyprSocket->connectToServer(targetPath); }); });
-
-    m_hyprSocket->connectToServer(targetPath);
-}
-
-void SysBackend::handleHyprlandData() {
-    m_hyprBuffer.append(m_hyprSocket->readAll());
-    while (m_hyprBuffer.contains('\n')) {
-        int idx = m_hyprBuffer.indexOf('\n');
-        QString line = QString::fromUtf8(m_hyprBuffer.left(idx)).trimmed();
-        m_hyprBuffer.remove(0, idx + 1);
-
-        if (line.startsWith("workspace>>") || line.startsWith("workspacev2>>")) {
-            QString data = line.split(">>").last();
-            int wsId = data.split(',').first().toInt(); 
-            if (wsId > 0) emit workspaceChanged(wsId);
-        }
-    }
-}
-
-// 2. Battery
+// Battery
 void SysBackend::setupBattery() {
     detectPowerSupplyPaths();
 

@@ -97,16 +97,21 @@ FocusScope {
         + "    pass\n"
     readonly property string applyScript: "import os,shutil,subprocess,sys\n"
         + "source,target,transition,step,duration,fps,angle,pos,bezier,wave,invert_y,pywal_enabled=sys.argv[1:13]\n"
-        + "if not source or not target:\n"
+        + "if not source:\n"
         + "    sys.exit(2)\n"
-        + "os.makedirs(os.path.dirname(target) or '.',exist_ok=True)\n"
-        + "shutil.copy2(source,target)\n"
-        + "cmd=['awww','img',target,'--transition-type',transition,'--transition-step',step,'--transition-duration',duration,'--transition-fps',fps,'--transition-angle',angle,'--transition-pos',pos,'--transition-bezier',bezier,'--transition-wave',wave]\n"
+        + "applied=source\n"
+        + "if target:\n"
+        + "    target=os.path.expanduser(target)\n"
+        + "    if os.path.realpath(source) != os.path.realpath(target):\n"
+        + "        os.makedirs(os.path.dirname(target) or '.',exist_ok=True)\n"
+        + "        shutil.copy2(source,target)\n"
+        + "    applied=target\n"
+        + "cmd=['awww','img',applied,'--transition-type',transition,'--transition-step',step,'--transition-duration',duration,'--transition-fps',fps,'--transition-angle',angle,'--transition-pos',pos,'--transition-bezier',bezier,'--transition-wave',wave]\n"
         + "if invert_y == 'true':\n"
         + "    cmd.append('--invert-y')\n"
         + "result=subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
         + "if pywal_enabled == 'true' and result.returncode == 0:\n"
-        + "    subprocess.run(['wal','-i',target],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
+        + "    subprocess.run(['wal','-i',applied],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
 
     readonly property var transitionTypes: ["none", "simple", "fade", "left", "right", "top", "bottom", "wipe", "wave", "grow", "center", "any", "outer", "random"]
     readonly property string configuredTransitionType: validTransitionType(userConfig.wallpaperTransitionType)
@@ -130,7 +135,6 @@ FocusScope {
             else
                 syncCurrentIndex();
             root.grabKeyboardFocus();
-            focusTimer.restart();
         } else {
             releaseResources();
         }
@@ -160,7 +164,6 @@ FocusScope {
         releasingResources = true;
         acceptingScanResults = false;
         closeAfterApply = false;
-        focusTimer.stop();
         if (scanProcess.running)
             scanProcess.running = false;
         if (applyProcess.running)
@@ -312,13 +315,6 @@ FocusScope {
         pathView.decrementCurrentIndex();
     }
 
-    Timer {
-        id: focusTimer
-        interval: 80
-        repeat: false
-        onTriggered: root.grabKeyboardFocus()
-    }
-
     Keys.onPressed: event => {
         switch (event.key) {
         case Qt.Key_Escape:
@@ -353,8 +349,8 @@ FocusScope {
     function applyWallpaper(filePath) {
         const targetPath = root.targetWallpaperPath;
         const commandText = root.customCommand.trim();
-        const useCustomCommand = root.customCommandEnabled;
-        if (filePath === "" || (useCustomCommand && commandText.length === 0) || (!useCustomCommand && targetPath === ""))
+        const useCustomCommand = root.customCommandEnabled && commandText.length > 0;
+        if (filePath === "")
             return;
         latestAppliedWallpaper = filePath;
         wallpaperApplied(filePath);

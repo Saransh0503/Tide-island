@@ -1,7 +1,7 @@
 <h1 align="center">Tide Island</h1>
 
 <p align="center">
-  <b>一个为 Hyprland 打造的流畅、轻量、灵活的交互式 Dynamic Island。</b>
+  <b>一个为 Hyprland 和 niri 打造的流畅、轻量、灵活的交互式 Dynamic Island。</b>
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
     <img alt="AUR package" src="https://img.shields.io/aur/version/tide-island?style=flat-square&label=AUR&color=8aadf4">
   </a>
   <img alt="Hyprland" src="https://img.shields.io/badge/Hyprland-111111?style=flat-square&color=8aadf4">
-  </a>
+  <img alt="niri" src="https://img.shields.io/badge/niri-111111?style=flat-square&color=8aadf4">
   <img alt="C++ + Qt" src="https://img.shields.io/badge/C%2B%2B%20%2B%20Qt-111111?style=flat-square&color=8aadf4">
 </p>
 
@@ -43,7 +43,7 @@
 
 ## 关于 Tide Island
 
-Tide Island 是一个给 Hyprland 用的小桌面组件，做成了类似灵动岛的样式。
+Tide Island 是一个给 Hyprland 和 niri 用的小桌面组件，做成了类似灵动岛的样式。
 
 平时没什么事的时候，它就待在角落里，不碍眼；需要看信息的时候，再展开成一个面板，可以看歌词、切换工作区、调系统设置、看通知，或者放几个自定义内容。
 
@@ -123,6 +123,12 @@ Tide Island 可以显示以下临时反馈：
 - RAM
 - CAVA 音频可视化
 
+### Compositor 支持范围
+
+- Hyprland: 保留完整体验，包括 Tide 自己的工作区总览、工作区动画、快捷键和基于 `hyprsunset` 的 Night Light。
+- niri: 支持 island 页面、发往聚焦输出的 IPC 命令、工作区切换提示、niri 原生 overview、通过 `~/.config/tide-island/niri-shortcuts.kdl` 管理快捷键，以及基于 `gammastep` 的 Night Light。
+- Tide 会优先读取 `TIDE_ISLAND_COMPOSITOR`，然后识别 `$XDG_CURRENT_DESKTOP`；只有桌面环境未明确给出时才使用 `$NIRI_SOCKET`，最后回退到 Hyprland。这可避免嵌套启动或切换 compositor 后继承的旧 socket 导致误判。
+
 <br>
 
 ## 安装
@@ -181,6 +187,14 @@ hl.exec_once("tide-island")
 
 <br>
 
+## 配置
+
+在应用启动器里搜索 `Tide Island Settings`。
+
+快捷键页面可以自动应用绑定。niri 下会生成 `~/.config/tide-island/niri-shortcuts.kdl`，把它 include 到 `~/.config/niri/config.kdl`，先运行 `niri validate`，成功后再用 `niri msg action load-config-file` 重新加载。
+
+<br>
+
 ## 常用命令
 
 #### 修改配置后重启:
@@ -231,6 +245,6 @@ systemctl --user restart tide-island
 
 <p align="center">
   <sub>
-    为喜欢安静,实用桌面的 Hyprland 用户而做。
+    为喜欢安静,实用桌面的 Hyprland 和 niri 用户而做。
   </sub>
 </p>

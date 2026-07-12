@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import IslandBackend
 
@@ -35,6 +34,9 @@ Scope {
     }
 
     function anyOverviewOpen() {
+        if (CompositorBackend.compositor === "niri")
+            return false;
+
         const windows = panelVariants.instances ? panelVariants.instances : [];
         for (let index = 0; index < windows.length; index++) {
             const window = windows[index];
@@ -46,22 +48,37 @@ Scope {
     }
 
     function prepareOverviewAll() {
+        if (CompositorBackend.compositor === "niri")
+            return;
+
         shellRoot.forEachWindow((window) => window.prepareOverview());
     }
 
     function cancelPreparedOverviewAll() {
+        if (CompositorBackend.compositor === "niri")
+            return;
+
         shellRoot.forEachWindow((window) => window.cancelPreparedOverview());
     }
 
     function openOverviewAll() {
+        if (CompositorBackend.compositor === "niri")
+            return;
+
         shellRoot.forEachWindow((window) => window.openOverview());
     }
 
     function closeOverviewAll() {
+        if (CompositorBackend.compositor === "niri")
+            return;
+
         shellRoot.forEachWindow((window) => window.closeOverview());
     }
 
     function toggleOverviewAll() {
+        if (CompositorBackend.compositor === "niri")
+            return;
+
         if (shellRoot.anyOverviewOpen())
             shellRoot.closeOverviewAll();
         else
@@ -109,13 +126,19 @@ Scope {
 
     function forFocusedWindow(callback) {
         const windows = panelVariants.instances ? panelVariants.instances : [];
+        let fallbackWindow = null;
         for (let index = 0; index < windows.length; index++) {
             const window = windows[index];
+            if (window && !fallbackWindow)
+                fallbackWindow = window;
             if (window && window.monitorFocused) {
                 callback(window);
                 return;
             }
         }
+
+        if (fallbackWindow)
+            callback(fallbackWindow);
     }
 
     IpcHandler {
@@ -190,6 +213,10 @@ Scope {
             shellRoot.forFocusedWindow((window) => window.showLyricsWindow());
         }
 
+        function swipeRight() {
+            shellRoot.forFocusedWindow((window) => window.swipeRightWindow());
+        }
+
         function togglePlayer() {
             shellRoot.forFocusedWindow((window) => window.togglePlayerWindow());
         }
@@ -201,13 +228,6 @@ Scope {
         function toggleWallpaperPicker() {
             shellRoot.forFocusedWindow((window) => window.toggleWallpaperPickerWindow());
         }
-    }
-
-    GlobalShortcut {
-        appid: "quickshell"
-        name: "dynamic-island-overview"
-
-        onPressed: shellRoot.toggleOverviewAll()
     }
 
     Connections {

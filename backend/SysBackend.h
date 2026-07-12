@@ -2,7 +2,6 @@
 
 #include <QObject>
 #include <QtQml/qqml.h>
-#include <QLocalSocket>
 #include <QProcess>
 #include <QFileSystemWatcher>
 #include <QSocketNotifier>
@@ -36,7 +35,6 @@ public:
     QString lyricsBackendStatus() const;
 
 signals:
-    void workspaceChanged(int wsId);
     void brightnessChanged(double val);
     void volumeChanged(int volPercentage, bool isMuted);
     void batteryCapacityChanged(int capacity);
@@ -48,7 +46,6 @@ signals:
     void lyricsBackendStatusChanged();
 
 private slots:
-    void handleHyprlandData();
     void handleVolumeEvent();
     void fetchCurrentVolume();
     void handleVolumeQueryFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -67,7 +64,6 @@ private slots:
     void handleLyricsStderr();
 
 private:
-    void setupHyprland();
     void setupBattery();
     void setupBatteryUpower();
     void setupAudio();
@@ -86,8 +82,6 @@ private:
     void setLyricsBackendStatus(const QString &status);
 
     bool m_isBluetoothAudio = false;
-    QLocalSocket *m_hyprSocket;
-    QByteArray m_hyprBuffer;
     QProcess *m_paSubscriber;
     QProcess *m_volumeQueryProcess;
     QProcess *m_defaultSinkQueryProcess;

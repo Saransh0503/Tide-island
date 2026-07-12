@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 import IslandBackend
@@ -18,7 +17,8 @@ PanelWindow {
     readonly property bool overviewPreparing: overviewPhase === "preparing"
     readonly property bool overviewVisible: overviewPhase === "preparing" || overviewPhase === "opening" || overviewPhase === "open"
     readonly property bool overviewMounted: overviewPhase !== "closed" || overviewPreloading
-    readonly property bool overviewLoaderActive: overviewMounted || overviewUnloadGraceTimer.running
+    readonly property bool overviewLoaderActive: !compositorIsNiri
+        && (overviewMounted || overviewUnloadGraceTimer.running)
     readonly property bool overviewDataReady: overviewLoader.item
         ? !!overviewLoader.item.overviewDataReady
         : false
@@ -26,16 +26,29 @@ PanelWindow {
     readonly property bool overviewVisualReady: overviewDataReady && overviewWallpaperReady
     readonly property bool overviewContentVisible: (overviewPhase === "opening" || overviewPhase === "open")
         && overviewVisualReady
-    readonly property var hyprMonitor: screen ? Hyprland.monitorFor(screen) : Hyprland.focusedMonitor
-    readonly property string hyprMonitorName: hyprMonitor && hyprMonitor.name ? String(hyprMonitor.name) : ""
-    readonly property bool monitorFocused: hyprMonitor ? hyprMonitor.focused : false
+    readonly property bool compositorIsNiri: CompositorBackend.compositor === "niri"
+    readonly property int compositorRevision: CompositorBackend.revision
+    readonly property string screenOutputName: screen && screen.name !== undefined ? String(screen.name) : ""
+    readonly property var hyprlandIntegration: hyprlandIntegrationLoader.item
+    readonly property var hyprMonitor: hyprlandIntegration ? hyprlandIntegration.monitor : null
+    readonly property string hyprMonitorName: hyprlandIntegration ? hyprlandIntegration.monitorName : ""
+    readonly property string compositorOutputName: compositorIsNiri ? screenOutputName : hyprMonitorName
+    readonly property bool monitorFocused: {
+        compositorRevision;
+        return compositorIsNiri
+            ? CompositorBackend.isOutputFocused(screenOutputName)
+            : (hyprlandIntegration ? hyprlandIntegration.monitorFocused : false);
+    }
     readonly property bool connectivityPromptActive: controlCenterLoader.item
         ? controlCenterLoader.item.hasConnectivityPrompt
         : false
     readonly property var controlCenterRef: controlCenterLoader.item
-    readonly property int currentMonitorWorkspaceId: hyprMonitor && hyprMonitor.activeWorkspace
-        ? hyprMonitor.activeWorkspace.id
-        : 1
+    readonly property int currentMonitorWorkspaceId: {
+        compositorRevision;
+        return compositorIsNiri
+            ? CompositorBackend.activeWorkspaceIndexForOutput(screenOutputName)
+            : (hyprlandIntegration ? hyprlandIntegration.workspaceId : 1);
+    }
     readonly property bool screenRecordingActive: shellRootController
         && shellRootController.screenRecordingActive !== undefined
         ? !!shellRootController.screenRecordingActive
@@ -47,8 +60,19 @@ PanelWindow {
 
     readonly property var userConfig: UserConfig
 
-    HyprlandDispatch {
-        id: hyprDispatch
+    Loader {
+        id: hyprlandIntegrationLoader
+
+        active: !root.compositorIsNiri
+        asynchronous: false
+        source: active ? "qml/island/HyprlandWindowIntegration.qml" : ""
+    }
+
+    Binding {
+        target: hyprlandIntegrationLoader.item
+        property: "screenObject"
+        value: root.screen
+        when: hyprlandIntegrationLoader.item !== null
     }
 
     color: StyleTokens.transparent
@@ -90,17 +114,15 @@ PanelWindow {
     }
     implicitHeight: root.overviewVisible
         ? Math.max(
-            Math.ceil(4 + root.connectivityDetailHeight + 12),
-            Math.ceil(4 + root.overviewCapsuleHeight + 8),
+            Math.ceil(userConfig.islandTopMargin + root.connectivityDetailHeight + 12),
+            Math.ceil(userConfig.islandTopMargin + root.overviewCapsuleHeight + 8),
             Math.ceil(root.controlCenterWindowHeight)
         )
-        : Math.max(Math.ceil(4 + root.connectivityDetailHeight + 12), Math.ceil(root.controlCenterWindowHeight))
+        : Math.max(Math.ceil(userConfig.islandTopMargin + root.connectivityDetailHeight + 12), Math.ceil(root.controlCenterWindowHeight))
     exclusiveZone: Math.ceil(root.baseExclusiveZone * root.exclusiveZoneProgress)
-    aboveWindows: true
-    focusable: islandContainer.wallpaperPickerLayerVisible
-        || islandContainer.expandedPlayerKeyboardFocusRequested
-        || (root.monitorFocused && (root.overviewVisible || root.connectivityPromptActive))
-    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.layer: islandContainer.wallpaperPickerLayerVisible
+        ? WlrLayer.Overlay
+        : WlrLayer.Top
     WlrLayershell.keyboardFocus: {
         if (islandContainer.wallpaperPickerLayerVisible)
             return WlrKeyboardFocus.Exclusive;
@@ -129,7 +151,7 @@ PanelWindow {
         const action = Number(userConfig.hoverExpandAction);
         return isNaN(action) ? 0 : Math.max(0, Math.min(2, Math.round(action)));
     }
-    readonly property real baseExclusiveZone: 4 + userConfig.islandHeight + 3
+    readonly property real baseExclusiveZone: userConfig.islandExclusiveZone
     readonly property bool hoverExpandEnabled: configuredHoverExpandAction > 0
     readonly property bool topGestureInputActive: !root.overviewVisible && islandContainer.canShowSideSwipe
     readonly property bool autoHideRuntimeEnabled: !shellRootController
@@ -192,7 +214,7 @@ PanelWindow {
         ? controlCenterLoader.item.controlCenterMaximumExtraHeight
         : 120
     readonly property real controlCenterWindowHeight: islandContainer.controlCenterLayerVisible
-        ? 4 + 320 + root.controlCenterMaximumExtraHeight + 12
+        ? userConfig.islandTopMargin + 320 + root.controlCenterMaximumExtraHeight + 12
         : 0
     readonly property real connectivityDetailGap: 16
     readonly property int connectivityDetailAnimationDuration: 360
@@ -315,6 +337,7 @@ PanelWindow {
     }
 
     function prepareOverview() {
+        if (compositorIsNiri) return;
         if (overviewPhase !== "closed") return;
         overviewUnloadGraceTimer.stop();
         overviewPreloading = true;
@@ -322,12 +345,15 @@ PanelWindow {
     }
 
     function cancelPreparedOverview() {
+        if (compositorIsNiri) return;
         if (overviewPhase !== "closed") return;
         overviewPreloadExpireTimer.stop();
         overviewPreloading = false;
     }
 
     function openOverview() {
+        if (compositorIsNiri)
+            return;
         if (overviewPhase !== "closed") return;
         overviewUnloadGraceTimer.stop();
         overviewPreloadExpireTimer.stop();
@@ -339,6 +365,8 @@ PanelWindow {
     }
 
     function closeOverview() {
+        if (compositorIsNiri)
+            return;
         if (!overviewMounted) return;
         if (overviewLoader.status === Loader.Ready)
             overviewUnloadGraceTimer.restart();
@@ -422,6 +450,9 @@ PanelWindow {
     }
 
     function toggleOverviewEverywhere() {
+        if (compositorIsNiri)
+            return;
+
         if (shellRootController && shellRootController.toggleOverviewAll) {
             shellRootController.toggleOverviewAll();
             return;
@@ -453,6 +484,16 @@ PanelWindow {
     }
     function showLyricsWindow() {
         islandContainer.showLyricsCapsule();
+        showAutoHiddenIsland("manual");
+        scheduleAutoHide();
+    }
+
+    function swipeRightWindow() {
+        if (islandContainer.restingState === "lyrics")
+            islandContainer.showTimeCapsule();
+        else if (islandContainer.restingState === "normal")
+            islandContainer.showCustomCapsule();
+
         showAutoHiddenIsland("manual");
         scheduleAutoHide();
     }
@@ -543,36 +584,6 @@ PanelWindow {
         onTriggered: root.hideAutoHiddenIsland(false)
     }
 
-    Timer {
-        id: wallpaperPickerFocusTimer
-        interval: 0
-        repeat: false
-        onTriggered: root.focusWallpaperPicker()
-    }
-
-    Timer {
-        id: wallpaperPickerFocusRetryTimer
-        property int remainingAttempts: 0
-        interval: 60
-        repeat: true
-        onTriggered: {
-            root.focusWallpaperPicker();
-            remainingAttempts -= 1;
-            if (remainingAttempts <= 0 || (wallpaperPickerLoader.item && wallpaperPickerLoader.item.activeFocus))
-                stop();
-        }
-    }
-
-    HyprlandFocusGrab {
-        id: wallpaperPickerFocusGrab
-        active: islandContainer.wallpaperPickerLayerVisible
-        windows: [root]
-        onCleared: {
-            if (islandContainer.wallpaperPickerLayerVisible)
-                islandContainer.smartRestoreState();
-        }
-    }
-
     function focusWallpaperPicker() {
         islandContainer.forceActiveFocus();
         if (wallpaperPickerLoader.item && wallpaperPickerLoader.item.grabKeyboardFocus)
@@ -631,13 +642,15 @@ PanelWindow {
 
     IslandClock {
         id: timeObj
+        clockFormat: userConfig.clockFormat
     }
 
     // --- 灵动岛主容器与全局状态 ---
     FocusScope {
         id: islandContainer
         anchors.fill: parent
-        focus: expandedPlayerKeyboardFocusRequested
+        focus: wallpaperPickerLayerVisible
+            || expandedPlayerKeyboardFocusRequested
             || (root.monitorFocused && (root.overviewVisible || root.connectivityPromptActive))
 
         property string islandState: "normal"
@@ -735,16 +748,6 @@ PanelWindow {
         readonly property bool notificationLayerVisible: !root.overviewVisible && islandState === "notification"
         readonly property bool controlCenterLayerVisible: !root.overviewVisible && islandState === "control_center"
         readonly property bool wallpaperPickerLayerVisible: !root.overviewVisible && islandState === "wallpaper_picker"
-        onWallpaperPickerLayerVisibleChanged: {
-            if (wallpaperPickerLayerVisible) {
-                wallpaperPickerFocusTimer.restart();
-                wallpaperPickerFocusRetryTimer.remainingAttempts = 8;
-                wallpaperPickerFocusRetryTimer.restart();
-            } else {
-                wallpaperPickerFocusTimer.stop();
-                wallpaperPickerFocusRetryTimer.stop();
-            }
-        }
         readonly property var activePlayer: mediaController.activePlayer
         readonly property string lyricsDisplayText: mediaController.displayText
         readonly property string currentTrack: mediaController.currentTrack
@@ -819,11 +822,13 @@ PanelWindow {
             }
         }
 
-        HyprlandWorkspaceTracker {
+        CompositorWorkspaceTracker {
             id: workspaceTracker
 
+            compositor: CompositorBackend.compositor
             hyprMonitor: root.hyprMonitor
-            monitorName: root.hyprMonitorName
+            hyprMonitorName: root.hyprMonitorName
+            outputName: root.compositorOutputName
             monitorFocused: root.monitorFocused
 
             onWorkspaceSynced: function(workspaceId) {
@@ -851,10 +856,12 @@ PanelWindow {
             if (!root.overviewVisible) return;
 
             if ((event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier)) || event.key === Qt.Key_Backtab) {
-                hyprDispatch.focusWorkspace("r-1");
+                if (root.hyprlandIntegration)
+                    root.hyprlandIntegration.focusWorkspace("r-1");
                 event.accepted = true;
             } else if (event.key === Qt.Key_Tab) {
-                hyprDispatch.focusWorkspace("r+1");
+                if (root.hyprlandIntegration)
+                    root.hyprlandIntegration.focusWorkspace("r+1");
                 event.accepted = true;
             }
         }
@@ -1604,7 +1611,8 @@ PanelWindow {
                 islandContainer.swipeTransitionProgress
             )
             color: root.overviewContentVisible ? root.overviewCapsuleColor : StyleTokens.black
-            y: 4 - (1 - root.autoHideProgress) * (targetHeight + 12)
+            y: userConfig.islandTopMargin
+                - (1 - root.autoHideProgress) * (targetHeight + userConfig.islandTopMargin + 8)
             x: parent ? parent.width * userConfig.islandPositionX / 100 - width / 2 : 0
             clip: true
             width: displayedWidth

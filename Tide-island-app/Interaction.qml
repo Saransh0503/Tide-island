@@ -297,6 +297,7 @@ PagePanel {
                     anchors.leftMargin: 18
                     anchors.right: parent.right
                     anchors.rightMargin: 18
+                    spacing: 15
 
                     HoverActionRow {
                         width: parent.width

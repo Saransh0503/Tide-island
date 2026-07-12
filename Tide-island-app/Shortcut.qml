@@ -8,65 +8,90 @@ PagePanel {
     property int captureIndex: -1
     property int captureTokenRevision: 0
     property var captureTokens: []
+    property bool hiddenLegacyOverviewShortcut: false
 
-    property var shortcuts: [
-        {
-            "action": "Workspace overview",
-            "mods": "SUPER",
-            "key": "TAB",
-            "target": "overview",
-            "method": "toggle"
-        },
-        {
-            "action": "Lyrics view",
-            "mods": "SUPER",
-            "key": "right",
-            "target": "tide",
-            "method": "showLyrics"
-        },
-        {
-            "action": "Custom page",
-            "mods": "SUPER",
-            "key": "left",
-            "target": "tide",
-            "method": "showCustom"
-        },
-        {
-            "action": "Clock view",
-            "mods": "SUPER",
-            "key": "down",
-            "target": "tide",
-            "method": "showClock"
-        },
-        {
-            "action": "Music player",
-            "mods": "SUPER",
-            "key": "M",
-            "target": "tide",
-            "method": "togglePlayer"
-        },
-        {
-            "action": "Control center",
-            "mods": "SUPER",
-            "key": "C",
-            "target": "tide",
-            "method": "toggleControlCenter"
-        },
-        {
-            "action": "Wallpaper library",
-            "mods": "SUPER",
-            "key": "W",
-            "target": "tide",
-            "method": "toggleWallpaperPicker"
-        },
-        {
-            "action": "Toggle island",
-            "mods": "SUPER",
-            "key": "F",
-            "target": "island",
-            "method": "toggle"
+    readonly property bool supportsTideWorkspaceOverview: backend.supportsTideWorkspaceOverview()
+    readonly property bool supportsHyprlandShortcutSnippets: backend.supportsHyprlandShortcutSnippets()
+    readonly property bool supportsNiriShortcutSnippets: backend.supportsNiriShortcutSnippets()
+    readonly property string compositorName: backend.compositorDisplayName()
+
+    property var shortcuts: []
+
+    function allShortcutDefinitions() {
+        return [
+            {
+                "action": "Workspace overview",
+                "mods": "SUPER",
+                "key": "TAB",
+                "target": "overview",
+                "method": "toggle"
+            },
+            {
+                "action": "Swipe right",
+                "mods": "SUPER",
+                "key": "right",
+                "target": "tide",
+                "method": "swipeRight"
+            },
+            {
+                "action": "Custom page",
+                "mods": "SUPER",
+                "key": "left",
+                "target": "tide",
+                "method": "showCustom"
+            },
+            {
+                "action": "Clock view",
+                "mods": "SUPER",
+                "key": "down",
+                "target": "tide",
+                "method": "showClock"
+            },
+            {
+                "action": "Music player",
+                "mods": "SUPER",
+                "key": "M",
+                "target": "tide",
+                "method": "togglePlayer"
+            },
+            {
+                "action": "Control center",
+                "mods": "SUPER",
+                "key": "C",
+                "target": "tide",
+                "method": "toggleControlCenter"
+            },
+            {
+                "action": "Wallpaper library",
+                "mods": "SUPER",
+                "key": "W",
+                "target": "tide",
+                "method": "toggleWallpaperPicker"
+            },
+            {
+                "action": "Toggle island",
+                "mods": "SUPER",
+                "key": "F",
+                "target": "island",
+                "method": "toggle"
+            }
+        ]
+    }
+
+    function isWorkspaceOverviewShortcut(shortcut) {
+        return shortcut && shortcut.target === "overview"
+    }
+
+    function supportedShortcutDefinitions() {
+        const supported = []
+        const all = allShortcutDefinitions()
+        for (let i = 0; i < all.length; ++i) {
+            if (!supportsTideWorkspaceOverview && isWorkspaceOverviewShortcut(all[i]))
+                continue
+            supported.push(all[i])
         }
-    ]
+        return supported
+    }
 
     function beginCapture(index) {
         captureIndex = index
@@ -97,6 +122,20 @@ PagePanel {
         return shortcut.target + ":" + shortcut.method
     }
 
+    function rawSavedShortcutBindings() {
+        const value = ConfigStore.value("shortcutBindings", [])
+        return Array.isArray(value) ? value : []
+    }
+
+    function savedHasWorkspaceOverviewShortcut() {
+        const saved = rawSavedShortcutBindings()
+        for (let i = 0; i < saved.length; ++i) {
+            if (isWorkspaceOverviewShortcut(saved[i]))
+                return true
+        }
+        return false
+    }
+
     function shortcutBindingsForBackend() {
         const bindings = []
         for (let i = 0; i < shortcuts.length; ++i) {
@@ -113,12 +152,14 @@ PagePanel {
 
     function applyShortcutBindings() {
         const bindings = shortcutBindingsForBackend()
-        ConfigStore.setValue("shortcutBindings", bindings)
-        ConfigStore.setValue("hyprlandBindMode", "configured")
         backend.applyShortcutBindings(bindings)
+        hiddenLegacyOverviewShortcut = false
     }
 
     function loadShortcutBindings() {
+        shortcuts = supportedShortcutDefinitions()
+        hiddenLegacyOverviewShortcut = !supportsTideWorkspaceOverview && savedHasWorkspaceOverviewShortcut()
+
         const saved = backend.shortcutBindings()
         const byIdentity = ({})
         for (let i = 0; i < saved.length; ++i)
@@ -445,6 +486,11 @@ PagePanel {
         return lines.join("\n")
     }
 
+    function niriConfigCommands() {
+        shortcutRevision
+        return backend.niriConfigCommands()
+    }
+
     Item {
         id: keyCapture
         focus: true
@@ -509,7 +555,28 @@ PagePanel {
 
                 Text {
                     width: parent.width
+                    text: supportsTideWorkspaceOverview
+                        ? "Current desktop: " + compositorName + ". Tide workspace overview shortcuts are available here."
+                        : "Current desktop: " + compositorName + ". Tide workspace overview is hidden here; use the compositor native overview or your own compositor config."
+                    color: Theme.subtleTextColor
+                    wrapMode: Text.WordWrap
+                    font.family: Theme.textFontFamily
+                    font.pixelSize: 14
+                }
+
+                Text {
+                    width: parent.width
                     text: "Island shortcuts call Quickshell IPC and can be reused in shell scripts; the default island action is toggle."
+                    color: Theme.subtleTextColor
+                    wrapMode: Text.WordWrap
+                    font.family: Theme.textFontFamily
+                    font.pixelSize: 14
+                }
+
+                Text {
+                    width: parent.width
+                    visible: hiddenLegacyOverviewShortcut
+                    text: "A saved Workspace overview shortcut exists from another compositor. It is hidden and will not be written to the current shortcut config."
                     color: Theme.subtleTextColor
                     wrapMode: Text.WordWrap
                     font.family: Theme.textFontFamily
@@ -550,6 +617,7 @@ PagePanel {
 
                 CopyBox {
                     width: parent.width
+                    visible: supportsHyprlandShortcutSnippets
                     title: "Hyprland.conf"
                     pathLabel: "~/.config/hypr/hyprland.conf"
                     description: "Paste these binds there, or reuse the island toggle command in your own scripts."
@@ -558,6 +626,16 @@ PagePanel {
 
                 CopyBox {
                     width: parent.width
+                    visible: supportsNiriShortcutSnippets
+                    title: "Niri config.kdl"
+                    pathLabel: "~/.config/tide-island/niri-shortcuts.kdl"
+                    description: "Tide includes this file from ~/.config/niri/config.kdl after niri validate succeeds."
+                    code: root.niriConfigCommands()
+                }
+
+                CopyBox {
+                    width: parent.width
+                    visible: supportsHyprlandShortcutSnippets
                     title: "Lua"
                     pathLabel: "~/.config/hypr/hyprland.lua"
                     description: "Use this variant when your Hyprland bindings are generated from Lua."

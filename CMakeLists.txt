@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(TideIsland VERSION 1.0.20 LANGUAGES CXX)
+project(TideIsland VERSION 1.0.21 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+
+option(TIDE_ISLAND_WITH_NIRI "Build niri compositor integration" ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Network DBus Test Concurrent)
 find_library(UDEV_LIB NAMES udev REQUIRED)
@@ -33,42 +35,71 @@ target_link_libraries(lyricsmpris PRIVATE
 
 enable_testing()
 
-add_executable(lyricsmpris_tests
-    tests/lyricsmpris_core_tests.cpp
-    lyricsmpris/CjkVariantNormalizer.h
-    lyricsmpris/CjkVariantNormalizer.cpp
-    lyricsmpris/LyricsCore.h
-    lyricsmpris/LyricsCore.cpp
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/lyricsmpris_core_tests.cpp")
+    add_executable(lyricsmpris_tests
+        tests/lyricsmpris_core_tests.cpp
+        lyricsmpris/CjkVariantNormalizer.h
+        lyricsmpris/CjkVariantNormalizer.cpp
+        lyricsmpris/LyricsCore.h
+        lyricsmpris/LyricsCore.cpp
+    )
 
-target_include_directories(lyricsmpris_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/lyricsmpris
-)
+    target_include_directories(lyricsmpris_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/lyricsmpris
+    )
 
-target_link_libraries(lyricsmpris_tests PRIVATE
-    Qt6::Core
-    Qt6::Test
-)
+    target_link_libraries(lyricsmpris_tests PRIVATE
+        Qt6::Core
+        Qt6::Test
+    )
 
-add_test(NAME lyricsmpris_core COMMAND lyricsmpris_tests)
+    add_test(NAME lyricsmpris_core COMMAND lyricsmpris_tests)
+endif()
 
-add_executable(user_config_backend_tests
-    tests/user_config_backend_tests.cpp
-    backend/UserConfigBackend.h
-    backend/UserConfigBackend.cpp
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/user_config_backend_tests.cpp")
+    add_executable(user_config_backend_tests
+        tests/user_config_backend_tests.cpp
+        backend/UserConfigBackend.h
+        backend/UserConfigBackend.cpp
+    )
 
-target_include_directories(user_config_backend_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/backend
-)
+    target_include_directories(user_config_backend_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/backend
+    )
 
-target_link_libraries(user_config_backend_tests PRIVATE
-    Qt6::Core
-    Qt6::Qml
-    Qt6::Test
-)
+    target_link_libraries(user_config_backend_tests PRIVATE
+        Qt6::Core
+        Qt6::Qml
+        Qt6::Test
+    )
 
-add_test(NAME user_config_backend COMMAND user_config_backend_tests)
+    add_test(NAME user_config_backend COMMAND user_config_backend_tests)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_backend_tests.cpp")
+    add_executable(compositor_backend_tests
+        tests/compositor_backend_tests.cpp
+        backend/CompositorBackend.h
+        backend/CompositorBackend.cpp
+    )
+
+    target_include_directories(compositor_backend_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/backend
+    )
+
+    target_compile_definitions(compositor_backend_tests PRIVATE
+        TIDE_ISLAND_WITH_NIRI=$<BOOL:${TIDE_ISLAND_WITH_NIRI}>
+    )
+
+    target_link_libraries(compositor_backend_tests PRIVATE
+        Qt6::Core
+        Qt6::Qml
+        Qt6::Network
+        Qt6::Test
+    )
+
+    add_test(NAME compositor_backend COMMAND compositor_backend_tests)
+endif()
 
 add_subdirectory(Tide-island-app)
 
@@ -81,6 +112,8 @@ qt_add_qml_module(IslandBackend
         backend/SysBackend.cpp
         backend/SystemServices.h
         backend/SystemServices.cpp
+        backend/CompositorBackend.h
+        backend/CompositorBackend.cpp
         backend/StyleTokensBackend.h
         backend/StyleTokensBackend.cpp
         backend/UserConfigBackend.h
@@ -95,6 +128,10 @@ qt_add_qml_module(IslandBackend
 
 target_include_directories(IslandBackend PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/backend
+)
+
+target_compile_definitions(IslandBackend PRIVATE
+    TIDE_ISLAND_WITH_NIRI=$<BOOL:${TIDE_ISLAND_WITH_NIRI}>
 )
 
 target_link_libraries(IslandBackend PRIVATE

@@ -77,6 +77,7 @@ Item {
     property bool nightLightEnabled: false
     property bool nightLightBusy: false
     property int nightLightTemperature: 4500
+    readonly property bool hyprlandNightLight: CompositorBackend.compositor === "hyprland"
     property bool focusEnabled: false
     property bool focusBusy: false
 
@@ -932,23 +933,27 @@ Item {
         command: [
             "sh",
             "-c",
-            "temp=\"$1\"\n"
-                + "if ! command -v hyprsunset >/dev/null 2>&1; then exit 127; fi\n"
-                + "if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
-                + "if ! command -v pgrep >/dev/null 2>&1 || ! pgrep -x hyprsunset >/dev/null 2>&1; then\n"
-                + "  if command -v setsid >/dev/null 2>&1; then\n"
-                + "    setsid hyprsunset >/dev/null 2>&1 < /dev/null &\n"
-                + "  else\n"
-                + "    nohup hyprsunset >/dev/null 2>&1 < /dev/null &\n"
-                + "  fi\n"
-                + "fi\n"
-                + "i=0\n"
-                + "while [ \"$i\" -lt 24 ]; do\n"
-                + "  if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
-                + "  i=$((i + 1))\n"
-                + "  sleep 0.04\n"
-                + "done\n"
-                + "exit 1",
+            controlCenter.hyprlandNightLight
+                ? "temp=\"$1\"\n"
+                    + "if ! command -v hyprsunset >/dev/null 2>&1; then exit 127; fi\n"
+                    + "if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
+                    + "if ! command -v pgrep >/dev/null 2>&1 || ! pgrep -x hyprsunset >/dev/null 2>&1; then\n"
+                    + "  if command -v setsid >/dev/null 2>&1; then\n"
+                    + "    setsid hyprsunset >/dev/null 2>&1 < /dev/null &\n"
+                    + "  else\n"
+                    + "    nohup hyprsunset >/dev/null 2>&1 < /dev/null &\n"
+                    + "  fi\n"
+                    + "fi\n"
+                    + "i=0\n"
+                    + "while [ \"$i\" -lt 24 ]; do\n"
+                    + "  if hyprctl hyprsunset temperature \"$temp\" >/dev/null 2>&1; then exit 0; fi\n"
+                    + "  i=$((i + 1))\n"
+                    + "  sleep 0.04\n"
+                    + "done\n"
+                    + "exit 1"
+                : "temp=\"$1\"\n"
+                    + "if ! command -v gammastep >/dev/null 2>&1; then exit 127; fi\n"
+                    + "gammastep -m wayland -P -O \"$temp\" >/dev/null 2>&1",
             "tide-night-light",
             controlCenter.nightLightTemperature.toString()
         ]
@@ -966,20 +971,36 @@ Item {
             controlCenter.nightLightBusy = false;
             controlCenter.nightLightEnabled = false;
             controlCenter.nightLightModeChanged(false);
-            controlCenter.requestNotification("Night Light", "Night Light unavailable", "Install hyprsunset to use Night Light.");
+            controlCenter.requestNotification("Night Light", "Night Light unavailable",
+                controlCenter.hyprlandNightLight
+                    ? "Install hyprsunset to use Night Light."
+                    : "Install gammastep to use Night Light.");
         }
     }
 
     Process {
         id: nightLightDisableProcess
-        command: ["sh", "-c", "hyprctl hyprsunset identity >/dev/null 2>&1 || true"]
+        command: [
+            "sh",
+            "-c",
+            controlCenter.hyprlandNightLight
+                ? "hyprctl hyprsunset identity >/dev/null 2>&1 || true"
+                : "if ! command -v gammastep >/dev/null 2>&1; then exit 127; fi\n"
+                    + "gammastep -m wayland -x >/dev/null 2>&1 || true"
+        ]
         running: false
 
         onExited: function(exitCode) {
             controlCenter.nightLightBusy = false;
             controlCenter.nightLightEnabled = false;
             controlCenter.nightLightModeChanged(false);
-            controlCenter.requestNotification("Night Light", "Night Light disabled", "");
+            if (exitCode === 127)
+                controlCenter.requestNotification("Night Light", "Night Light unavailable",
+                    controlCenter.hyprlandNightLight
+                        ? "Install hyprsunset to use Night Light."
+                        : "Install gammastep to use Night Light.");
+            else
+                controlCenter.requestNotification("Night Light", "Night Light disabled", "");
         }
     }
 

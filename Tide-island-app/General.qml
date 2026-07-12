@@ -5,6 +5,10 @@ import QtQuick
 PagePanel {
     id: root
 
+    readonly property bool supportsTideWorkspaceOverview: backend.supportsTideWorkspaceOverview()
+    readonly property string compositorName: backend.compositorDisplayName()
+    readonly property string nightLightBackendName: backend.nightLightBackendName()
+
     function intValue(key, fallback) {
         return String(ConfigStore.value(key, fallback))
     }
@@ -64,14 +68,31 @@ PagePanel {
             Text {
                 id: apperanceTitle
                 text: "Island apperance"
-                anchors.top : title.bottom
-                anchors.topMargin: 40
+                anchors.top : desktopHint.bottom
+                anchors.topMargin: 34
                 anchors.left: parent.left
                 anchors.leftMargin: 32
                 anchors.right: parent.right
                 anchors.rightMargin: 40
                 font.family: Theme.titleFontFamily
                 font.pixelSize: 23
+            }
+
+            Text {
+                id: desktopHint
+                anchors.top: title.bottom
+                anchors.topMargin: 18
+                anchors.left: parent.left
+                anchors.leftMargin: 60
+                anchors.right: parent.right
+                anchors.rightMargin: 40
+                text: supportsTideWorkspaceOverview
+                    ? "Current desktop: " + compositorName + ". Full Tide workspace overview and shortcuts are available; Night Light uses " + nightLightBackendName + "."
+                    : "Current desktop: " + compositorName + ". Settings shows all Tide features except Tide workspace overview; Night Light uses " + nightLightBackendName + "."
+                color: Theme.subtleTextColor
+                wrapMode: Text.WordWrap
+                font.family: Theme.textFontFamily
+                font.pixelSize: 14
             }
 
             Rectangle {
@@ -117,6 +138,34 @@ PagePanel {
                         keyName: "islandHeight"
                         fallbackText: "38"
                         numeric: true
+                        width: parent.width
+                    }
+
+                    SplitLine { width: parent.width }
+
+                    ClockFormatRow { width: parent.width }
+
+                    SplitLine { width: parent.width }
+
+                    ConfigRow {
+                        title: "Reserved Top Space"
+                        description: "Screen space reserved for the island (exclusive zone)"
+                        keyName: "islandExclusiveZone"
+                        fallbackText: "45"
+                        numeric: true
+                        minimumValue: 0
+                        width: parent.width
+                    }
+
+                    SplitLine { width: parent.width }
+
+                    ConfigRow {
+                        title: "Top Margin"
+                        description: "Distance between the island and the top of the screen"
+                        keyName: "islandTopMargin"
+                        fallbackText: "4"
+                        numeric: true
+                        minimumValue: 0
                         width: parent.width
                     }
 
@@ -250,6 +299,76 @@ PagePanel {
         function commit() {
             if (numeric) {
                 field.text = String(root.saveInt(row.keyName, field.text, Number(row.fallbackText), row.minimumValue, row.maximumValue))
+            }
+        }
+    }
+
+    component ClockFormatRow: Item {
+        id: clockRow
+
+        property string selectedFormat: String(ConfigStore.value("clockFormat", "12")) === "24" ? "24" : "12"
+
+        height: 49
+
+        Text {
+            id: clockTitle
+            text: "Clock Format"
+            font.family: Theme.textFontFamily
+            font.pixelSize: 18
+            anchors.top: parent.top
+            anchors.left: parent.left
+        }
+
+        Text {
+            text: "Choose 12-hour or 24-hour time"
+            font.family: Theme.textFontFamily
+            font.pixelSize: 14
+            anchors.top: clockTitle.bottom
+            anchors.topMargin: 5
+            anchors.left: clockTitle.left
+            color: Theme.subtleTextColor
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Repeater {
+                model: ["12", "24"]
+
+                Rectangle {
+                    id: formatButton
+                    readonly property bool selected: clockRow.selectedFormat === modelData
+
+                    width: 82
+                    height: 36
+                    radius: 8
+                    color: selected ? Theme.selectedColor : (formatMouse.containsMouse ? Theme.accentSoftColor : Theme.inputBgColor)
+                    border.width: 2
+                    border.color: selected ? Theme.selectedColor : Theme.inputBorderColor
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData + " hour"
+                        color: formatButton.selected ? Theme.buttonTextColor : Theme.textColor
+                        font.family: Theme.textFontFamily
+                        font.pixelSize: 14
+                        font.weight: formatButton.selected ? Font.DemiBold : Font.Normal
+                    }
+
+                    MouseArea {
+                        id: formatMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            clockRow.selectedFormat = modelData
+                            ConfigStore.setValue("clockFormat", modelData)
+                            ConfigStore.save()
+                        }
+                    }
+                }
             }
         }
     }

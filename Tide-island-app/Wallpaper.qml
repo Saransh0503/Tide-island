@@ -14,6 +14,7 @@ Rectangle {
     property int revision: 0
     readonly property bool customCommandActive: revision >= 0 && boolValue("wallpaperCustomCommandEnabled", false)
     readonly property string customCommandSavedText: revision >= 0 ? textValue("wallpaperCustomCommand", "") : ""
+    readonly property bool supportsTideWorkspaceOverview: backend.supportsTideWorkspaceOverview()
 
     color: "transparent"
     radius: 10
@@ -79,8 +80,10 @@ Rectangle {
         spacing: 16
 
         PathRow {
-            title: "Wallpaper Path"
-            description: "Target file used by awww and workspace overview"
+            title: "Wallpaper Target (Optional)"
+            description: root.supportsTideWorkspaceOverview
+                ? "Stable copy used by the workspace overview; leave empty to apply the selected file directly"
+                : "Optional copy path; leave empty to apply the selected file directly"
             keyName: "wallpaperPath"
             fallbackText: ""
             directoryMode: false

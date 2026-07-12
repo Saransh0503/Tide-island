@@ -34,6 +34,7 @@ class UserConfigBackend final : public QObject {
     Q_PROPERTY(QString textFontFamily READ textFontFamily NOTIFY textFontFamilyChanged FINAL)
     Q_PROPERTY(QString heroFontFamily READ heroFontFamily NOTIFY heroFontFamilyChanged FINAL)
     Q_PROPERTY(QString timeFontFamily READ timeFontFamily NOTIFY timeFontFamilyChanged FINAL)
+    Q_PROPERTY(QString clockFormat READ clockFormat NOTIFY clockFormatChanged FINAL)
     Q_PROPERTY(QString tlpSudoPassword READ tlpSudoPassword NOTIFY tlpSudoPasswordChanged FINAL)
     Q_PROPERTY(QString tlpPermissionMode READ tlpPermissionMode NOTIFY tlpPermissionModeChanged FINAL)
 
@@ -51,6 +52,8 @@ class UserConfigBackend final : public QObject {
 
     Q_PROPERTY(int islandWidth READ islandWidth NOTIFY islandWidthChanged FINAL)
     Q_PROPERTY(int islandHeight READ islandHeight NOTIFY islandHeightChanged FINAL)
+    Q_PROPERTY(int islandExclusiveZone READ islandExclusiveZone NOTIFY islandExclusiveZoneChanged FINAL)
+    Q_PROPERTY(int islandTopMargin READ islandTopMargin NOTIFY islandTopMarginChanged FINAL)
     Q_PROPERTY(int islandPositionX READ islandPositionX NOTIFY islandPositionXChanged FINAL)
     Q_PROPERTY(int bodyFontSize READ bodyFontSize NOTIFY bodyFontSizeChanged FINAL)
     Q_PROPERTY(int titleFontSize READ titleFontSize NOTIFY titleFontSizeChanged FINAL)
@@ -81,6 +84,7 @@ public:
     QString textFontFamily() const;
     QString heroFontFamily() const;
     QString timeFontFamily() const;
+    QString clockFormat() const;
     QString tlpSudoPassword() const;
     QString tlpPermissionMode() const;
     int workspaceOverviewWindowDragButton() const;
@@ -95,6 +99,8 @@ public:
     int islandAutoHideDelayMs() const;
     int islandWidth() const;
     int islandHeight() const;
+    int islandExclusiveZone() const;
+    int islandTopMargin() const;
     int islandPositionX() const;
     int bodyFontSize() const;
     int titleFontSize() const;
@@ -128,6 +134,7 @@ signals:
     void textFontFamilyChanged();
     void heroFontFamilyChanged();
     void timeFontFamilyChanged();
+    void clockFormatChanged();
     void tlpSudoPasswordChanged();
     void tlpPermissionModeChanged();
     void workspaceOverviewWindowDragButtonChanged();
@@ -142,6 +149,8 @@ signals:
     void islandAutoHideDelayMsChanged();
     void islandWidthChanged();
     void islandHeightChanged();
+    void islandExclusiveZoneChanged();
+    void islandTopMarginChanged();
     void islandPositionXChanged();
     void bodyFontSizeChanged();
     void titleFontSizeChanged();
@@ -175,6 +184,7 @@ private:
     QString m_textFontFamily = QStringLiteral("Inter Display");
     QString m_heroFontFamily = QStringLiteral("Inter Display");
     QString m_timeFontFamily = QStringLiteral("Inter Display");
+    QString m_clockFormat = QStringLiteral("12");
     QString m_tlpSudoPassword;
     QString m_tlpPermissionMode = QStringLiteral("skip");
     int m_workspaceOverviewWindowDragButton = 1;
@@ -189,6 +199,8 @@ private:
     int m_islandAutoHideDelayMs = 1000;
     int m_islandWidth = 140;
     int m_islandHeight = 38;
+    int m_islandExclusiveZone = 45;
+    int m_islandTopMargin = 4;
     int m_islandPositionX = 50;
     int m_bodyFontSize = 16;
     int m_titleFontSize = 20;

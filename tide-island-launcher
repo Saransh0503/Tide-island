@@ -8,12 +8,20 @@
 QML_PATH="/usr/share/tide-island"
 SERVICE_NAME="tide-island.service"
 
-if [[ -z "${INVOCATION_ID:-}" ]]; then
+if [[ "${SYSTEMD_EXEC_PID:-}" != "$$" ]]; then
   if systemctl --user is-active --quiet "$SERVICE_NAME" \
       || pgrep -u "$(id -u)" -f "/usr/bin/quickshell -p $QML_PATH" >/dev/null; then
     /usr/bin/quickshell ipc --any-display -p "$QML_PATH" call island show >/dev/null 2>&1 || true
     exit 0
   fi
+fi
+
+desktop_name=":${XDG_CURRENT_DESKTOP,,}:"
+compositor_override="${TIDE_ISLAND_COMPOSITOR,,}"
+if [[ "$compositor_override" == "niri" ]] \
+    || [[ -z "$compositor_override" && "$desktop_name" == *":niri:"* ]] \
+    || [[ -z "$compositor_override" && "$desktop_name" != *":hyprland:"* && -n "${NIRI_SOCKET:-}" ]]; then
+  /usr/bin/tide-island-config-app --ensure-niri-shortcuts || true
 fi
 
 exec /usr/bin/quickshell -p "$QML_PATH" "$@"

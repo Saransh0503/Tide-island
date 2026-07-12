@@ -32,7 +32,6 @@ REQUIRED_PACKAGES=(
   libjemalloc-dev
   libcli11-dev
   spirv-tools
-  hyprland
   wireplumber
   pulseaudio-utils
   brightnessctl
@@ -42,6 +41,8 @@ REQUIRED_PACKAGES=(
 )
 
 OPTIONAL_PACKAGES=(
+  hyprland
+  niri
   cava
   imagemagick
   awww
