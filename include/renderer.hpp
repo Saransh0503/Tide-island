@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <expected>
 
 // ============================================================================
@@ -17,9 +18,33 @@ struct Vertex {
     float r, g, b, a;
 };
 
+enum tex_pos : char {
+    begin,
+    middle,
+    end
+};
+
+struct ObjFrame {
+    float x, y;
+    float width, height;
+};
+
 std::expected<void, const char*> init();
-std::expected<void, const char*> draw_rectangle(float width, float height, float x, float y, float radius, std::array<float, 4> color);
-void frame();
+
+std::expected<void, const char*> draw_rectangle(
+    ObjFrame obj_frame,
+    float radius,
+    std::array<float, 4> color);
+
+std::expected<void, const char*> draw_text(
+    ObjFrame obj_frame,
+    const char* text,
+    std::size_t font_size,
+    std::array<float, 4> color,
+    tex_pos xpos = tex_pos::middle,
+    tex_pos ypos = tex_pos::middle);
+
+std::expected<void, const char*> frame();
 void shutdown();
 
 } // namespace Renderer

@@ -31,8 +31,7 @@ int main() {
 
     frame_logger(Log::Warning,
         "This build was compiled in debug mode.",
-        "Performance may be reduced and additional debug output may appear."
-    );
+        "Performance may be reduced and additional debug output may appear.");
 
 #endif
 
@@ -55,7 +54,7 @@ int main() {
 
     GraphicBackend::inspect_graphics_backend_after_context();
 
-    Renderer::frame();
+    Log::check(Renderer::frame());
 
     Wayland::swap_buffer();
 
