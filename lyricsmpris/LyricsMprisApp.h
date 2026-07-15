@@ -43,6 +43,7 @@ private slots:
     void updatePosition();
     void startFallbackProviders();
     void handleNetworkFinished();
+    void retryCurrentTrack();
 
 private:
     struct PlayerInfo {
@@ -72,6 +73,8 @@ private:
     void requestPlayerPosition(const QString &service);
     qint64 estimatedPositionMs(const PlayerInfo &player) const;
     void startTrack(const PlayerInfo &player);
+    void startSearchAttempt();
+    bool scheduleSearchRetry();
     QString trackKeyFor(const PlayerInfo &player) const;
     TrackQuery queryFor(const PlayerInfo &player) const;
     void tryInlineLyrics(const PlayerInfo &player, bool *hasSyncedDocument);
@@ -105,8 +108,10 @@ private:
     QTimer m_refreshTimer;
     QTimer m_positionTimer;
     QTimer m_fallbackTimer;
+    QTimer m_retryTimer;
     QHash<QString, PlayerInfo> m_players;
     QSet<QString> m_pendingPlayerUpdates;
+    QSet<QString> m_queuedPlayerUpdates;
     QSet<QString> m_pendingPositionRequests;
     QString m_activeService;
     QString m_currentTrackKey;
@@ -117,6 +122,7 @@ private:
     int m_bestSyncedScore = 0;
     int m_bestPlainScore = 0;
     int m_generation = 0;
+    int m_searchAttempt = 0;
     int m_pendingReplies = 0;
     bool m_fallbackStarted = false;
     bool m_hasAcceptedDocument = false;

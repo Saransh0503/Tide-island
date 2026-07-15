@@ -19,6 +19,7 @@ add_executable(lyricsmpris
     lyricsmpris/CjkVariantNormalizer.cpp
     lyricsmpris/LyricsCore.h
     lyricsmpris/LyricsCore.cpp
+    lyricsmpris/ProviderNetworkPolicy.h
     lyricsmpris/LyricsMprisApp.h
     lyricsmpris/LyricsMprisApp.cpp
 )
@@ -99,6 +100,36 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_backend_tests.cpp")
     )
 
     add_test(NAME compositor_backend COMMAND compositor_backend_tests)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/lyricsmpris_runtime_tests.cpp")
+    add_executable(lyricsmpris_runtime_tests
+        tests/lyricsmpris_runtime_tests.cpp
+    )
+
+    target_link_libraries(lyricsmpris_runtime_tests PRIVATE
+        Qt6::Core
+        Qt6::DBus
+        Qt6::Network
+        Qt6::Test
+    )
+
+    target_include_directories(lyricsmpris_runtime_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/lyricsmpris
+    )
+
+    add_dependencies(lyricsmpris_runtime_tests lyricsmpris)
+
+    find_program(DBUS_RUN_SESSION_EXECUTABLE NAMES dbus-run-session REQUIRED)
+    add_test(
+        NAME lyricsmpris_runtime
+        COMMAND "${DBUS_RUN_SESSION_EXECUTABLE}" --
+            "${CMAKE_COMMAND}" -E env
+            TIDE_ISLAND_RUNTIME_TEST_ISOLATED=1
+            "LYRICSMPRIS_TEST_EXECUTABLE=$<TARGET_FILE:lyricsmpris>"
+            "$<TARGET_FILE:lyricsmpris_runtime_tests>"
+    )
+    set_tests_properties(lyricsmpris_runtime PROPERTIES TIMEOUT 20)
 endif()
 
 add_subdirectory(Tide-island-app)

@@ -1,4 +1,5 @@
 #include "LyricsMprisApp.h"
+#include "ProviderNetworkPolicy.h"
 
 #include <QCoreApplication>
 #include <QDBusArgument>
@@ -28,6 +29,8 @@ namespace {
 constexpr int kPrimaryFallbackDelayMs = 1800;
 constexpr int kRefreshIntervalMs = 1500;
 constexpr int kPositionIntervalMs = 350;
+constexpr int kRetryBaseDelayMs = 2500;
+constexpr int kMaxSearchAttempts = 3;
 constexpr int kDbusTimeoutMs = 1000;
 constexpr int kNetworkTimeoutMs = 7000;
 constexpr int kDownloadCandidateLimit = 5;
@@ -100,6 +103,9 @@ LyricsMprisApp::LyricsMprisApp(AppOptions options, QObject *parent)
     m_fallbackTimer.setInterval(kPrimaryFallbackDelayMs);
     m_fallbackTimer.setSingleShot(true);
     connect(&m_fallbackTimer, &QTimer::timeout, this, &LyricsMprisApp::startFallbackProviders);
+
+    m_retryTimer.setSingleShot(true);
+    connect(&m_retryTimer, &QTimer::timeout, this, &LyricsMprisApp::retryCurrentTrack);
 }
 
 void LyricsMprisApp::start() {
@@ -218,7 +224,10 @@ void LyricsMprisApp::emitLine(const QString &line, bool synced) {
 }
 
 void LyricsMprisApp::updatePlayer(const QString &service) {
-    if (m_pendingPlayerUpdates.contains(service)) return;
+    if (m_pendingPlayerUpdates.contains(service)) {
+        m_queuedPlayerUpdates.insert(service);
+        return;
+    }
 
     QDBusMessage message = QDBusMessage::createMethodCall(
         service,
@@ -231,10 +240,15 @@ void LyricsMprisApp::updatePlayer(const QString &service) {
     auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message, kDbusTimeoutMs), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher, service]() {
         m_pendingPlayerUpdates.remove(service);
+        const bool updateQueued = m_queuedPlayerUpdates.remove(service);
 
         QDBusPendingReply<QVariantMap> reply = *watcher;
         watcher->deleteLater();
-        if (reply.isError()) return;
+        if (reply.isError()) {
+            if (updateQueued)
+                QTimer::singleShot(0, this, [this, service]() { updatePlayer(service); });
+            return;
+        }
 
         const QVariantMap propertyMap = reply.value();
         const QDateTime now = QDateTime::currentDateTimeUtc();
@@ -263,6 +277,8 @@ void LyricsMprisApp::updatePlayer(const QString &service) {
         m_players.insert(service, player);
         requestPlayerPosition(service);
         chooseActivePlayer();
+        if (updateQueued)
+            QTimer::singleShot(0, this, [this, service]() { updatePlayer(service); });
     });
 }
 
@@ -365,8 +381,20 @@ void LyricsMprisApp::chooseActivePlayer() {
     if (nextTrackKey != m_currentTrackKey) {
         startTrack(player);
     } else {
-        m_currentPlayer = player;
-        updatePosition();
+        const bool inlineLyricsArrived = !player.inlineLyrics.isEmpty()
+            && player.inlineLyrics != m_currentPlayer.inlineLyrics;
+        const bool localUrlArrived = !player.url.isEmpty()
+            && player.url != m_currentPlayer.url
+            && (QUrl(player.url).isLocalFile() || QFileInfo::exists(player.url));
+        if (!m_currentDocument.hasSyncedLines()
+            && (inlineLyricsArrived || (m_currentDocument.isEmpty() && localUrlArrived))) {
+            // Some MPRIS players publish the track identity first, then attach
+            // embedded lyrics or the local media URL in a later metadata update.
+            startTrack(player);
+        } else {
+            m_currentPlayer = player;
+            updatePosition();
+        }
     }
 }
 
@@ -392,31 +420,84 @@ TrackQuery LyricsMprisApp::queryFor(const PlayerInfo &player) const {
 
 void LyricsMprisApp::startTrack(const PlayerInfo &player) {
     clearCurrentTrack();
-    m_generation++;
     m_activeService = player.service;
     m_currentPlayer = player;
     m_currentTrackKey = trackKeyFor(player);
+    m_searchAttempt = 0;
+    startSearchAttempt();
+}
+
+void LyricsMprisApp::startSearchAttempt() {
+    if (m_currentTrackKey.isEmpty()) return;
+
+    m_retryTimer.stop();
+    m_fallbackTimer.stop();
+    abortNetwork();
+    releaseCurrentDocument();
+    m_bestSyncedDocument.clearAndFree();
+    m_bestPlainCandidate = ProviderCandidate();
+    m_startedProviders.clear();
+    m_generation++;
+    m_searchAttempt++;
     m_fallbackStarted = false;
     m_hasAcceptedDocument = false;
     m_bestSyncedScore = 0;
     m_bestPlainScore = 0;
-    m_bestSyncedDocument.clearAndFree();
-    m_bestPlainCandidate = ProviderCandidate();
     emitLine(QString(), false);
     emitStatus(QStringLiteral("searching"));
 
-    if (player.title.trimmed().isEmpty()) {
-        emitStatus(QStringLiteral("not_found"));
-        maybeQuitLookup();
+    if (m_currentPlayer.title.trimmed().isEmpty()) {
+        if (!scheduleSearchRetry()) {
+            emitStatus(QStringLiteral("not_found"));
+            maybeQuitLookup();
+        }
         return;
     }
 
     bool hasSyncedDocument = false;
-    tryInlineLyrics(player, &hasSyncedDocument);
-    if (!hasSyncedDocument) tryLocalLyrics(player, &hasSyncedDocument);
+    tryInlineLyrics(m_currentPlayer, &hasSyncedDocument);
+    if (!hasSyncedDocument) tryLocalLyrics(m_currentPlayer, &hasSyncedDocument);
     if (hasSyncedDocument) return;
 
     startRemoteProviders();
+}
+
+bool LyricsMprisApp::scheduleSearchRetry() {
+    if (m_options.lookupMode || m_searchAttempt >= kMaxSearchAttempts) return false;
+    if (m_retryTimer.isActive()) return true;
+
+    int delayMs = kRetryBaseDelayMs;
+    for (int attempt = 1; attempt < m_searchAttempt; ++attempt)
+        delayMs *= 3;
+
+    emitStatus(QStringLiteral("retrying"));
+    m_retryTimer.start(delayMs);
+    return true;
+}
+
+void LyricsMprisApp::retryCurrentTrack() {
+    if (m_currentTrackKey.isEmpty() || !m_currentDocument.isEmpty()) return;
+
+    PlayerInfo latestPlayer = m_players.value(m_activeService, m_currentPlayer);
+    if (latestPlayer.service.isEmpty()) latestPlayer = m_currentPlayer;
+    if (latestPlayer.playbackStatus == QLatin1String("Stopped")) {
+        clearCurrentTrack();
+        return;
+    }
+
+    const QString latestTrackKey = trackKeyFor(latestPlayer);
+    if (latestTrackKey != m_currentTrackKey) {
+        startTrack(latestPlayer);
+        return;
+    }
+
+    m_currentPlayer = latestPlayer;
+    // A fresh process also gets a fresh QNetworkAccessManager. Clear its
+    // long-lived connection/auth state before retrying to provide the same
+    // recovery without restarting Tide Island.
+    m_network.clearAccessCache();
+    m_network.clearConnectionCache();
+    startSearchAttempt();
 }
 
 void LyricsMprisApp::tryInlineLyrics(const PlayerInfo &player, bool *hasSyncedDocument) {
@@ -617,12 +698,7 @@ QNetworkReply *LyricsMprisApp::get(const QUrl &url, const QString &provider, con
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("lyricsmpris-cpp/2.1 TideIsland"));
     request.setRawHeader("Accept", "application/json,text/plain,*/*");
-    if (provider == QLatin1String("netease"))
-        request.setRawHeader("Referer", "https://music.163.com/");
-    else if (provider == QLatin1String("qq"))
-        request.setRawHeader("Referer", "https://y.qq.com/");
-    else if (provider == QLatin1String("kugou"))
-        request.setRawHeader("Referer", "https://www.kugou.com/");
+    applyProviderNetworkPolicy(request, provider);
     request.setTransferTimeout(kNetworkTimeoutMs);
 
     QNetworkReply *reply = m_network.get(request);
@@ -664,6 +740,17 @@ void LyricsMprisApp::handleNetworkFinished() {
     const QString provider = reply->property("provider").toString();
     const QString stage = reply->property("stage").toString();
     const bool current = generation == m_generation && !m_currentTrackKey.isEmpty();
+    if (current && reply->error() != QNetworkReply::NoError && lyricsDebugEnabled()) {
+        QUrl safeUrl = reply->url();
+        safeUrl.setQuery(QString());
+        QTextStream stream(stderr);
+        stream << "[LyricsNetwork] provider=" << provider
+               << " stage=" << stage
+               << " error=" << int(reply->error())
+               << " message=\"" << reply->errorString() << "\""
+               << " url=\"" << safeUrl.toString() << "\""
+               << Qt::endl;
+    }
     const QByteArray body = current && reply->error() == QNetworkReply::NoError ? safeBody(reply) : QByteArray();
 
     if (current && !body.isEmpty()) {
@@ -814,6 +901,7 @@ void LyricsMprisApp::rememberPlainCandidate(ProviderCandidate candidate, int sco
 }
 
 void LyricsMprisApp::acceptDocument(LyricDocument document, const QString &status, bool finalSynced) {
+    m_retryTimer.stop();
     releaseCurrentDocument();
     m_currentDocument = std::move(document);
     m_hasAcceptedDocument = true;
@@ -845,6 +933,7 @@ void LyricsMprisApp::maybeFinishSearch() {
     }
 
     if (!m_hasAcceptedDocument) {
+        if (scheduleSearchRetry()) return;
         emitLine(QString(), false);
         emitStatus(QStringLiteral("not_found"));
         maybeQuitLookup();
@@ -872,6 +961,7 @@ void LyricsMprisApp::updatePosition() {
 
 void LyricsMprisApp::clearCurrentTrack() {
     m_fallbackTimer.stop();
+    m_retryTimer.stop();
     m_positionTimer.stop();
     abortNetwork();
     releaseCurrentDocument();
@@ -886,6 +976,7 @@ void LyricsMprisApp::clearCurrentTrack() {
     m_hasAcceptedDocument = false;
     m_bestSyncedScore = 0;
     m_bestPlainScore = 0;
+    m_searchAttempt = 0;
     m_bestPlainCandidate = ProviderCandidate();
     emitLine(QString(), false);
     emitStatus(QStringLiteral("idle"));
