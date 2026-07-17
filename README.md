@@ -162,6 +162,10 @@ installs dependencies on:
 - Fedora, RHEL, and derivatives using `dnf`
 - openSUSE using `zypper`
 
+Every tagged release is built, tested, and installation-layout checked in
+Fedora 43, Debian 13, and openSUSE Tumbleweed containers before it is
+published.
+
 Arch-based systems should use the AUR package. Other Linux distributions can
 install the dependencies manually and run:
 

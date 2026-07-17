@@ -10,42 +10,41 @@ permissions:
   contents: write
 
 jobs:
-  source-release:
-    name: Test and publish source release
+  compatibility-build:
+    name: Build on ${{ matrix.name }}
     runs-on: ubuntu-latest
-    container: fedora:43
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Fedora 43
+            image: fedora:43
+            install: >-
+              dnf install -y gcc-c++ cmake ninja-build pkgconf-pkg-config git
+              tar dbus-daemon qt6-qtbase-devel qt6-qtdeclarative-devel
+              systemd-devel
+          - name: Debian 13
+            image: debian:trixie
+            install: >-
+              apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y
+              build-essential cmake ninja-build pkg-config git tar dbus
+              qt6-base-dev qt6-declarative-dev libudev-dev
+          - name: openSUSE Tumbleweed
+            image: opensuse/tumbleweed
+            install: >-
+              zypper --non-interactive install --no-recommends gcc-c++ cmake
+              ninja pkg-config git tar gzip dbus-1 qt6-base-devel
+              qt6-declarative-devel systemd-devel
+    container:
+      image: ${{ matrix.image }}
 
     steps:
+      - name: Install build dependencies
+        shell: bash
+        run: ${{ matrix.install }}
+
       - name: Check out tagged source
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Install build dependencies
-        run: |
-          dnf install -y \
-            gcc-c++ \
-            cmake \
-            ninja-build \
-            pkgconf-pkg-config \
-            git \
-            gh \
-            tar \
-            xz \
-            qt6-qtbase-devel \
-            qt6-qtdeclarative-devel \
-            systemd-devel
-
-      - name: Validate release version
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          cmake_version="$(sed -nE 's/^project\(TideIsland VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)"
-          pkgbuild_version="$(sed -nE 's/^pkgver=([0-9.]+)$/\1/p' PKGBUILD)"
-          test -n "$version"
-          test "$version" = "$cmake_version"
-          test "$version" = "$pkgbuild_version"
 
       - name: Test installer branches
         run: tests/installer_tests.sh
@@ -78,6 +77,28 @@ jobs:
           test -f "$stage/usr/lib/systemd/user/tide-island.service"
           test ! -e "$stage/usr/lib/qt6/qml/TideIsland/Document.qml"
           test -z "$(find "$stage" -name '*qml_module_dir_map.qrc' -print -quit)"
+
+  source-release:
+    name: Publish source release
+    needs: compatibility-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cmake_version="$(sed -nE 's/^project\(TideIsland VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)"
+          pkgbuild_version="$(sed -nE 's/^pkgver=([0-9.]+)$/\1/p' PKGBUILD)"
+          test -n "$version"
+          test "$version" = "$cmake_version"
+          test "$version" = "$pkgbuild_version"
 
       - name: Create reproducible source asset
         shell: bash

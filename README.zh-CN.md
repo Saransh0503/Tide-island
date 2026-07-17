@@ -162,6 +162,9 @@ cd Tide-island-*
 - Fedora、RHEL 及其衍生版：`dnf`
 - openSUSE：`zypper`
 
+每个版本发布前都会在 Fedora 43、Debian 13 和 openSUSE Tumbleweed 容器中
+完成构建、测试与安装布局检查，三个环境全部通过后才会发布。
+
 Arch 系发行版请使用 AUR。其他 Linux 发行版可以自行安装依赖，然后运行：
 
 ```bash

@@ -226,7 +226,7 @@ apt_install_dependencies() {
     qt6-shadertools-dev libqt6svg6 libqt6svg6-dev
     libudev-dev libdrm-dev libwayland-dev wayland-protocols
     libgbm-dev vulkan-headers libjemalloc-dev libcli11-dev spirv-tools
-    wireplumber pulseaudio-utils brightnessctl dbus-bin upower bluez
+    wireplumber pulseaudio-utils brightnessctl dbus upower bluez
     policykit-1 zenity network-manager
   )
 
@@ -261,7 +261,7 @@ dnf_install_dependencies() {
     qt6-qtshadertools-devel qt6-qtsvg-devel
     systemd-devel libdrm-devel wayland-devel wayland-protocols-devel
     mesa-libgbm-devel vulkan-headers jemalloc-devel CLI11-devel spirv-tools-devel
-    wireplumber pulseaudio-utils brightnessctl upower bluez bluez-tools
+    wireplumber pulseaudio-utils brightnessctl dbus-daemon upower bluez bluez-tools
     polkit zenity NetworkManager
   )
 
@@ -293,7 +293,7 @@ zypper_install_dependencies() {
     qt6-shadertools-devel qt6-svg-devel
     systemd-devel libdrm-devel wayland-devel wayland-protocols-devel
     Mesa-libgbm-devel vulkan-headers libjemalloc-devel CLI11-devel spirv-tools-devel
-    wireplumber pulseaudio-utils brightnessctl upower bluez
+    wireplumber pulseaudio-utils brightnessctl dbus-1 upower bluez
     polkit zenity NetworkManager
   )
 
