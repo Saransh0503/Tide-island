@@ -13,27 +13,28 @@ jobs:
   source-release:
     name: Test and publish source release
     runs-on: ubuntu-latest
+    container: fedora:43
 
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Install build dependencies
-        env:
-          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
+          dnf install -y \
+            gcc-c++ \
             cmake \
             ninja-build \
-            pkg-config \
-            xz-utils \
-            qt6-base-dev \
-            qt6-declarative-dev \
-            libudev-dev
+            pkgconf-pkg-config \
+            git \
+            gh \
+            tar \
+            xz \
+            qt6-qtbase-devel \
+            qt6-qtdeclarative-devel \
+            systemd-devel
 
       - name: Validate release version
         shell: bash
